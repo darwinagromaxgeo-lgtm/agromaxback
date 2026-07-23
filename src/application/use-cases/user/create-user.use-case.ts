@@ -1,4 +1,4 @@
-import { Injectable, Inject, ConflictException } from '@nestjs/common';
+import { BadRequestException, Injectable, Inject, ConflictException } from '@nestjs/common';
 import * as bcrypt from 'bcryptjs';
 import { IUserRepository, USER_REPOSITORY } from '../../../domain/repositories/user.repository';
 import { CreateUserDto } from '../../dtos/user/create-user.dto';
@@ -19,15 +19,20 @@ export class CreateUserUseCase {
     }
 
     const hashedPassword = await bcrypt.hash(dto.password, 10);
+    const role = dto.role || 'VENDEDOR';
+    if (role !== 'ADMIN' && (!dto.branchAssignments || dto.branchAssignments.length === 0)) {
+      throw new BadRequestException('Asigna al menos una sucursal al usuario');
+    }
     const user = await this.userRepository.create({
       username: dto.username,
       email: dto.email,
       password: hashedPassword,
       fullName: dto.fullName,
-      role: dto.role || 'VENDEDOR',
+      role,
+      branchAssignments: role === 'ADMIN' ? [] : dto.branchAssignments,
       isActive: true,
     });
 
-    return { id: user.id, username: user.username, email: user.email, fullName: user.fullName, role: user.role, isActive: user.isActive };
+    return { id: user.id, username: user.username, email: user.email, fullName: user.fullName, role: user.role, branchAssignments: user.branchAssignments, isActive: user.isActive };
   }
 }

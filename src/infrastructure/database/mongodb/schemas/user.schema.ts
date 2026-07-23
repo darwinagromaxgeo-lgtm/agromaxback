@@ -1,5 +1,16 @@
 import { Prop, Schema, SchemaFactory } from '@nestjs/mongoose';
-import { Document } from 'mongoose';
+import { Document, Types } from 'mongoose';
+
+@Schema({ _id: false })
+export class UserBranchAssignmentSubdoc {
+  @Prop({ type: Types.ObjectId, ref: 'BranchDocument', required: true })
+  branch: Types.ObjectId;
+
+  @Prop({ required: true })
+  role: string;
+}
+
+export const UserBranchAssignmentSchema = SchemaFactory.createForClass(UserBranchAssignmentSubdoc);
 
 @Schema({ timestamps: true, collection: 'users' })
 export class UserDocument {
@@ -17,6 +28,9 @@ export class UserDocument {
 
   @Prop({ required: true, default: 'VENDEDOR' })
   role: string;
+
+  @Prop({ type: [UserBranchAssignmentSchema], default: [] })
+  branchAssignments: UserBranchAssignmentSubdoc[];
 
   @Prop({ default: true })
   isActive: boolean;

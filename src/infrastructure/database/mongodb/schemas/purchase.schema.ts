@@ -1,5 +1,6 @@
 import { Prop, Schema, SchemaFactory } from '@nestjs/mongoose';
 import { Document, Types } from 'mongoose';
+import { applyBranchScope } from '../branch-scope.plugin';
 
 @Schema({ _id: false })
 export class PurchaseItemSubdoc {
@@ -90,6 +91,9 @@ export const ReceptionSubdocSchema = SchemaFactory.createForClass(ReceptionSubdo
 
 @Schema({ timestamps: true, collection: 'purchases' })
 export class PurchaseDocument {
+  @Prop({ type: Types.ObjectId, ref: 'BranchDocument', required: true })
+  branch: Types.ObjectId;
+
   @Prop({ type: Types.ObjectId, ref: 'CompanyDocument', required: true })
   company: Types.ObjectId;
 
@@ -165,10 +169,11 @@ export class PurchaseDocument {
 
 export type PurchaseDoc = PurchaseDocument & Document;
 export const PurchaseSchema = SchemaFactory.createForClass(PurchaseDocument);
+applyBranchScope(PurchaseSchema);
 
-PurchaseSchema.index({ company: 1, date: -1 });
+PurchaseSchema.index({ branch: 1, company: 1, date: -1 });
 PurchaseSchema.index({ 'items.product': 1 });
 PurchaseSchema.index(
-  { company: 1, supplierId: 1, documentType: 1, documentSeries: 1, documentNumber: 1 },
+  { branch: 1, company: 1, supplierId: 1, documentType: 1, documentSeries: 1, documentNumber: 1 },
   { unique: true, partialFilterExpression: { documentNumber: { $exists: true, $type: 'string' } } },
 );

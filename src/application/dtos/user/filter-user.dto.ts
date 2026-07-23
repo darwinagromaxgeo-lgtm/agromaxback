@@ -5,6 +5,10 @@ import { PaginationDto } from '../common/pagination.dto';
 export class FilterUserDto extends PaginationDto {
   @IsOptional()
   @IsString()
+  branchId?: string;
+
+  @IsOptional()
+  @IsString()
   role?: string;
 
   @IsOptional()

@@ -20,6 +20,9 @@ export class ProductPriceSubdoc {
   @Prop({ type: Types.ObjectId, ref: 'CompanyDocument' })
   company?: Types.ObjectId;
 
+  @Prop({ type: Types.ObjectId, ref: 'BranchDocument' })
+  branch?: Types.ObjectId;
+
   @Prop({ required: true })
   price: number;
 }
@@ -28,6 +31,9 @@ export const ProductPriceSubdocSchema = SchemaFactory.createForClass(ProductPric
 
 @Schema({ timestamps: true, collection: 'products' })
 export class ProductDocument {
+  @Prop({ index: true, sparse: true })
+  externalId?: string;
+
   @Prop({ required: true })
   name: string;
 

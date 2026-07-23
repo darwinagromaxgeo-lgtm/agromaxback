@@ -3,6 +3,7 @@ export interface StockMovementEntity {
   productId: string;
   productName?: string;
   companyId: string;
+  branchId?: string;
   movementType: string;
   quantity: number;
   previousStock: number;

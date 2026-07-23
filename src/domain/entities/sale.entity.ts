@@ -16,6 +16,7 @@ export interface SalePaymentEntity {
 
 export interface SaleEntity {
   id?: string;
+  branchId?: string;
   companyId?: string;
   clientId?: string;
   items: SaleItemEntity[];

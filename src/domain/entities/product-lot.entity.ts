@@ -2,6 +2,7 @@ export interface ProductLotEntity {
   id?: string;
   productId: string;
   companyId: string;
+  branchId?: string;
   lotNumber: string;
   expirationDate?: Date;
   initialQuantity: number;

@@ -11,16 +11,19 @@ export class MongoStockRepository implements IStockRepository {
     @InjectModel(StockDocument.name) private readonly stockModel: Model<StockDoc>,
   ) {}
 
-  async findByProductAndCompany(productId: string, companyId: string): Promise<StockEntity | null> {
-    const doc = await this.stockModel.findOne({
+  async findByProductAndCompany(productId: string, companyId: string, branchId?: string): Promise<StockEntity | null> {
+    const query: any = {
       product: new Types.ObjectId(productId),
       company: new Types.ObjectId(companyId),
-    }).lean().exec();
+    };
+    if (branchId) query.branch = new Types.ObjectId(branchId);
+    const doc = await this.stockModel.findOne(query).lean().exec();
     return doc ? this.toEntity(doc) : null;
   }
 
-  async findByCompany(companyId: string, page = 1, limit = 20): Promise<{ data: StockEntity[]; total: number }> {
-    const query = { company: new Types.ObjectId(companyId) };
+  async findByCompany(companyId: string, page = 1, limit = 20, branchId?: string): Promise<{ data: StockEntity[]; total: number }> {
+    const query: any = { company: new Types.ObjectId(companyId) };
+    if (branchId) query.branch = new Types.ObjectId(branchId);
     const [data, total] = await Promise.all([
       this.stockModel.find(query).populate('product').skip((page - 1) * limit).limit(limit).lean().exec(),
       this.stockModel.countDocuments(query).exec(),
@@ -28,17 +31,21 @@ export class MongoStockRepository implements IStockRepository {
     return { data: data.map((d) => this.toEntity(d)), total };
   }
 
-  async findByProduct(productId: string): Promise<StockEntity[]> {
-    const docs = await this.stockModel.find({ product: new Types.ObjectId(productId) }).lean().exec();
+  async findByProduct(productId: string, branchId?: string): Promise<StockEntity[]> {
+    const query: any = { product: new Types.ObjectId(productId) };
+    if (branchId) query.branch = new Types.ObjectId(branchId);
+    const docs = await this.stockModel.find(query).lean().exec();
     return docs.map((d) => this.toEntity(d));
   }
 
-  async upsert(productId: string, companyId: string, quantityChange: number): Promise<StockEntity> {
+  async upsert(productId: string, companyId: string, quantityChange: number, branchId?: string): Promise<StockEntity> {
     // Buscar primero el documento existente
-    const existing = await this.stockModel.findOne({
+    const query: any = {
       product: new Types.ObjectId(productId),
       company: new Types.ObjectId(companyId),
-    }).lean().exec();
+    };
+    if (branchId) query.branch = new Types.ObjectId(branchId);
+    const existing = await this.stockModel.findOne(query).lean().exec();
 
     if (existing) {
       // Actualizar por _id: garantiza que siempre se actualiza el mismo documento
@@ -54,18 +61,21 @@ export class MongoStockRepository implements IStockRepository {
     const created = await this.stockModel.create({
       product: new Types.ObjectId(productId),
       company: new Types.ObjectId(companyId),
+      branch: branchId ? new Types.ObjectId(branchId) : undefined,
       quantity: quantityChange,
       lastUpdated: new Date(),
     });
     return this.toEntity(created.toObject());
   }
 
-  async decrementToZero(productId: string, companyId: string, quantity: number): Promise<StockEntity | null> {
+  async decrementToZero(productId: string, companyId: string, quantity: number, branchId?: string): Promise<StockEntity | null> {
+    const query: any = {
+      product: new Types.ObjectId(productId),
+      company: new Types.ObjectId(companyId),
+    };
+    if (branchId) query.branch = new Types.ObjectId(branchId);
     const doc = await this.stockModel.findOneAndUpdate(
-      {
-        product: new Types.ObjectId(productId),
-        company: new Types.ObjectId(companyId),
-      },
+      query,
       [
         {
           $set: {
@@ -79,16 +89,20 @@ export class MongoStockRepository implements IStockRepository {
     return doc ? this.toEntity(doc) : null;
   }
 
-  async findAll(): Promise<StockEntity[]> {
-    const docs = await this.stockModel.find({ quantity: { $gt: 0 } }).lean().exec();
+  async findAll(branchId?: string): Promise<StockEntity[]> {
+    const query: any = { quantity: { $gt: 0 } };
+    if (branchId) query.branch = new Types.ObjectId(branchId);
+    const docs = await this.stockModel.find(query).lean().exec();
     return docs.map((d) => this.toEntity(d));
   }
 
-  async getLowStock(companyId: string, threshold: number): Promise<StockEntity[]> {
-    const docs = await this.stockModel.find({
+  async getLowStock(companyId: string, threshold: number, branchId?: string): Promise<StockEntity[]> {
+    const query: any = {
       company: new Types.ObjectId(companyId),
       quantity: { $lte: threshold },
-    }).populate('product').lean().exec();
+    };
+    if (branchId) query.branch = new Types.ObjectId(branchId);
+    const docs = await this.stockModel.find(query).populate('product').lean().exec();
     return docs.map((d) => this.toEntity(d));
   }
 
@@ -97,6 +111,7 @@ export class MongoStockRepository implements IStockRepository {
       id: doc._id.toString(),
       productId: doc.product?._id?.toString() || doc.product?.toString(),
       companyId: doc.company?.toString(),
+      branchId: doc.branch?._id?.toString() || doc.branch?.toString(),
       quantity: doc.quantity,
       lastUpdated: doc.lastUpdated,
     };

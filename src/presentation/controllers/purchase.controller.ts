@@ -1,4 +1,5 @@
 import { Controller, Delete, Get, Post, Patch, Body, Query, Param } from '@nestjs/common';
+import { BranchScoped } from '../../common/decorators/branch-scoped.decorator';
 import { ApiTags, ApiOperation, ApiBearerAuth } from '@nestjs/swagger';
 import { RegisterPurchaseUseCase } from '../../application/use-cases/purchase/register-purchase.use-case';
 import { GetPurchasesUseCase } from '../../application/use-cases/purchase/get-purchases.use-case';
@@ -22,6 +23,7 @@ import { Roles } from '../../common/decorators/roles.decorator';
 @ApiTags('Purchases')
 @ApiBearerAuth('JWT')
 @Controller('purchases')
+@BranchScoped()
 export class PurchaseController {
   constructor(
     private readonly registerPurchase: RegisterPurchaseUseCase,

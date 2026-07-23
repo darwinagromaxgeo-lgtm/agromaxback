@@ -1,4 +1,5 @@
 import { Controller, Get, Post, Body, Param, Query } from '@nestjs/common';
+import { BranchScoped } from '../../common/decorators/branch-scoped.decorator';
 import { ApiTags, ApiOperation, ApiBearerAuth, ApiParam } from '@nestjs/swagger';
 import { CreateLoanUseCase } from '../../application/use-cases/loan/create-loan.use-case';
 import { GetLoansUseCase } from '../../application/use-cases/loan/get-loans.use-case';
@@ -11,6 +12,7 @@ import { CurrentUser } from '../../common/decorators/current-user.decorator';
 @ApiTags('Loans')
 @ApiBearerAuth('JWT')
 @Controller('loans')
+@BranchScoped()
 export class LoanController {
   constructor(
     private readonly createLoan: CreateLoanUseCase,

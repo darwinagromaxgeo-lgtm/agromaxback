@@ -1,4 +1,5 @@
 import { Controller, Get, Post, Patch, Query, Body, Param } from '@nestjs/common';
+import { BranchScoped } from '../../common/decorators/branch-scoped.decorator';
 import { ApiTags, ApiOperation, ApiBearerAuth } from '@nestjs/swagger';
 import { GetProductLotsUseCase } from '../../application/use-cases/product-lot/get-product-lots.use-case';
 import { UpsertProductLotUseCase } from '../../application/use-cases/product-lot/upsert-product-lot.use-case';
@@ -9,6 +10,7 @@ import { UpdateProductLotDto } from '../../application/dtos/product-lot/update-p
 @ApiTags('ProductLots')
 @ApiBearerAuth('JWT')
 @Controller('product-lots')
+@BranchScoped()
 export class ProductLotController {
   constructor(
     private readonly getLots: GetProductLotsUseCase,

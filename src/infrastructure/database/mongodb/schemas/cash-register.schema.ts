@@ -1,5 +1,6 @@
 import { Prop, Schema, SchemaFactory } from '@nestjs/mongoose';
 import { Document, Types } from 'mongoose';
+import { applyBranchScope } from '../branch-scope.plugin';
 
 @Schema({ _id: false })
 export class EditHistorySubdoc {
@@ -82,7 +83,10 @@ export const CashRegisterEntrySubdocSchema = SchemaFactory.createForClass(CashRe
 
 @Schema({ timestamps: true, collection: 'cash_registers' })
 export class CashRegisterDocument {
-  @Prop({ required: true, unique: true })
+  @Prop({ type: Types.ObjectId, ref: 'BranchDocument', required: true })
+  branch: Types.ObjectId;
+
+  @Prop({ required: true })
   date: string;
 
   @Prop({ required: true, default: 0 })
@@ -132,6 +136,7 @@ export class CashRegisterDocument {
 
 export type CashRegisterDoc = CashRegisterDocument & Document;
 export const CashRegisterSchema = SchemaFactory.createForClass(CashRegisterDocument);
+applyBranchScope(CashRegisterSchema);
 
-CashRegisterSchema.index({ date: 1 }, { unique: true });
-CashRegisterSchema.index({ status: 1 });
+CashRegisterSchema.index({ branch: 1, date: 1 }, { unique: true });
+CashRegisterSchema.index({ branch: 1, status: 1 });

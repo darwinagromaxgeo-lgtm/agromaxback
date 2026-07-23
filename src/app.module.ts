@@ -30,8 +30,11 @@ import { ProductLotModule } from './modules/product-lot.module';
 import { QuoteModule } from './modules/quote.module';
 import { JwtAuthGuard } from './presentation/guards/jwt-auth.guard';
 import { RolesGuard } from './presentation/guards/roles.guard';
+import { BranchAccessGuard } from './presentation/guards/branch-access.guard';
+import { BranchModule } from './modules/branch.module';
 import { HttpExceptionFilter } from './presentation/filters/http-exception.filter';
 import { ResponseTransformInterceptor } from './presentation/interceptors/response-transform.interceptor';
+import { BranchContextInterceptor } from './presentation/interceptors/branch-context.interceptor';
 
 @Module({
   imports: [
@@ -41,15 +44,17 @@ import { ResponseTransformInterceptor } from './presentation/interceptors/respon
       useFactory: (configService: ConfigService) => ({ uri: configService.get<string>('database.uri') }),
       inject: [ConfigService],
     }),
-    AuthModule, CompanyModule, CategoryModule, UnitModule, PriceTierModule, ProductModule, StockModule, PurchaseModule, SaleModule, ClientModule,
+    AuthModule, UserModule, BranchModule, CompanyModule, CategoryModule, UnitModule, PriceTierModule, ProductModule, StockModule, PurchaseModule, SaleModule, ClientModule,
     StockAdjustmentModule, CashRegisterModule, CreditAccountModule, DashboardModule, UserModule, StockMovementModule, LoanModule, PaymentMethodModule, AccountPayableModule,
     LookupModule, SupplierModule, ProductLotModule, QuoteModule, PaymentAgreementsModule,
   ],
   providers: [
     { provide: APP_GUARD, useClass: JwtAuthGuard },
+    { provide: APP_GUARD, useClass: BranchAccessGuard },
     { provide: APP_GUARD, useClass: RolesGuard },
     { provide: APP_FILTER, useClass: HttpExceptionFilter },
     { provide: APP_INTERCEPTOR, useClass: ResponseTransformInterceptor },
+    { provide: APP_INTERCEPTOR, useClass: BranchContextInterceptor },
   ],
 })
 export class AppModule {}

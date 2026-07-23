@@ -1,4 +1,5 @@
 import { Controller, Get, Post, Body, Query } from '@nestjs/common';
+import { BranchScoped } from '../../common/decorators/branch-scoped.decorator';
 import { ApiTags, ApiOperation, ApiBearerAuth } from '@nestjs/swagger';
 import { CreateStockAdjustmentUseCase } from '../../application/use-cases/stock-adjustment/create-stock-adjustment.use-case';
 import { GetStockAdjustmentsUseCase } from '../../application/use-cases/stock-adjustment/get-stock-adjustments.use-case';
@@ -9,6 +10,7 @@ import { CurrentUser } from '../../common/decorators/current-user.decorator';
 @ApiTags('Stock Adjustments')
 @ApiBearerAuth('JWT')
 @Controller('stock-adjustments')
+@BranchScoped()
 export class StockAdjustmentController {
   constructor(
     private readonly createAdjustment: CreateStockAdjustmentUseCase,

@@ -25,6 +25,7 @@ export interface LoanReturnEntity {
 
 export interface LoanEntity {
   id?: string;
+  branchId?: string;
   borrowerName: string;
   items: LoanItemEntity[];
   status: 'ACTIVE' | 'PARTIAL' | 'RETURNED';

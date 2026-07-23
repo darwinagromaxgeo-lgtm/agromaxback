@@ -15,6 +15,10 @@ export class ProductPriceDto {
   @IsString()
   companyId?: string;
 
+  @IsOptional()
+  @IsString()
+  branchId?: string;
+
   @IsNumber()
   price: number;
 }

@@ -2,6 +2,7 @@ export interface StockAdjustmentEntity {
   id?: string;
   productId: string;
   companyId: string;
+  branchId?: string;
   type: 'INCREASE' | 'DECREASE';
   quantity: number;
   reason: string;

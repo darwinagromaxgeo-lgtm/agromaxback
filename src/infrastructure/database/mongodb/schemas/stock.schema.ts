@@ -1,5 +1,6 @@
 import { Prop, Schema, SchemaFactory } from '@nestjs/mongoose';
 import { Document, Types } from 'mongoose';
+import { applyBranchScope } from '../branch-scope.plugin';
 
 @Schema({ timestamps: true, collection: 'stocks' })
 export class StockDocument {
@@ -8,6 +9,9 @@ export class StockDocument {
 
   @Prop({ type: Types.ObjectId, ref: 'CompanyDocument', required: true })
   company: Types.ObjectId;
+
+  @Prop({ type: Types.ObjectId, ref: 'BranchDocument', required: true })
+  branch: Types.ObjectId;
 
   @Prop({ required: true, default: 0 })
   quantity: number;
@@ -18,5 +22,7 @@ export class StockDocument {
 
 export type StockDoc = StockDocument & Document;
 export const StockSchema = SchemaFactory.createForClass(StockDocument);
+applyBranchScope(StockSchema);
 
-StockSchema.index({ product: 1, company: 1 }, { unique: true });
+StockSchema.index({ product: 1, company: 1, branch: 1 }, { unique: true });
+StockSchema.index({ branch: 1, company: 1 });

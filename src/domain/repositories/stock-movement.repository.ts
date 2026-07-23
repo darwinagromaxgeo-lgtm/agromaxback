@@ -6,6 +6,7 @@ export interface IStockMovementRepository {
     filter?: {
       productId?: string;
       companyId?: string;
+      branchId?: string;
       movementType?: string;
       startDate?: Date;
       endDate?: Date;

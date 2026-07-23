@@ -1,3 +1,8 @@
+export interface UserBranchAssignment {
+  branchId: string;
+  role: string;
+}
+
 export interface UserEntity {
   id?: string;
   username: string;
@@ -5,6 +10,7 @@ export interface UserEntity {
   password: string;
   fullName: string;
   role: string;
+  branchAssignments?: UserBranchAssignment[];
   isActive: boolean;
   createdAt?: Date;
   updatedAt?: Date;

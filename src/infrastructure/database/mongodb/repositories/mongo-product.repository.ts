@@ -21,7 +21,7 @@ export class MongoProductRepository implements IProductRepository {
       activeIngredient: product.activeIngredient,
       activeIngredients: (product.activeIngredients || []).map(i => ({ name: i.name, concentration: i.concentration || '' })),
       taxType: product.taxType || 'GRAVADO',
-      prices: product.prices.map((p) => ({ priceTier: p.priceTierId, ...(p.companyId && { company: p.companyId }), price: p.price })),
+      prices: product.prices.map((p) => ({ priceTier: p.priceTierId, ...(p.companyId && { company: p.companyId }), ...(p.branchId && { branch: p.branchId }), price: p.price })),
       tracksLot: product.tracksLot ?? false,
       isActive: product.isActive,
       location: product.location,
@@ -76,7 +76,7 @@ export class MongoProductRepository implements IProductRepository {
       delete updateData.categoryId;
     }
     if (product.prices) {
-      updateData.prices = product.prices.map((p) => ({ priceTier: p.priceTierId, ...(p.companyId && { company: p.companyId }), price: p.price }));
+      updateData.prices = product.prices.map((p) => ({ priceTier: p.priceTierId, ...(p.companyId && { company: p.companyId }), ...(p.branchId && { branch: p.branchId }), price: p.price }));
     }
     if (product.activeIngredients !== undefined) {
       updateData.activeIngredients = product.activeIngredients.map(i => ({ name: i.name, concentration: i.concentration || '' }));
@@ -108,6 +108,7 @@ export class MongoProductRepository implements IProductRepository {
       prices: (doc.prices || []).map((p: any) => ({
         priceTierId: p.priceTier?.toString() || p.priceTier,
         ...(p.company && { companyId: p.company.toString() }),
+        ...(p.branch && { branchId: p.branch.toString() }),
         price: p.price,
       })),
       isActive: doc.isActive,

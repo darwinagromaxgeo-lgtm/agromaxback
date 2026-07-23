@@ -1,4 +1,5 @@
 import { Controller, Get, Post, Patch, Delete, Body, Query, Param } from '@nestjs/common';
+import { BranchScoped } from '../../common/decorators/branch-scoped.decorator';
 import { ApiTags, ApiOperation, ApiBearerAuth, ApiParam } from '@nestjs/swagger';
 import { CreateSaleUseCase } from '../../application/use-cases/sale/create-sale.use-case';
 import { GetSalesUseCase } from '../../application/use-cases/sale/get-sales.use-case';
@@ -13,6 +14,7 @@ import { CurrentUser } from '../../common/decorators/current-user.decorator';
 @ApiTags('Sales')
 @ApiBearerAuth('JWT')
 @Controller('sales')
+@BranchScoped()
 export class SaleController {
   constructor(
     private readonly createSale: CreateSaleUseCase,

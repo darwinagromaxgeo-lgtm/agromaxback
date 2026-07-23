@@ -1,4 +1,5 @@
 import { Controller, Get, Post, Body, Param, Query } from '@nestjs/common';
+import { BranchScoped } from '../../common/decorators/branch-scoped.decorator';
 import { ApiTags, ApiOperation, ApiBearerAuth, ApiParam, ApiQuery } from '@nestjs/swagger';
 import { GetStockByCompanyUseCase } from '../../application/use-cases/stock/get-stock-by-company.use-case';
 import { TransferStockUseCase } from '../../application/use-cases/stock/transfer-stock.use-case';
@@ -10,6 +11,7 @@ import { PaginationDto } from '../../application/dtos/common/pagination.dto';
 @ApiTags('Stock')
 @ApiBearerAuth('JWT')
 @Controller('stock')
+@BranchScoped()
 export class StockController {
   constructor(
     private readonly getStockByCompany: GetStockByCompanyUseCase,

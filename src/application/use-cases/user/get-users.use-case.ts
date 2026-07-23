@@ -10,7 +10,7 @@ export class GetUsersUseCase {
 
   async execute(filter: FilterUserDto) {
     return this.userRepository.findAll(
-      { search: filter.search, role: filter.role, isActive: filter.isActive },
+      { search: filter.search, role: filter.role, isActive: filter.isActive, branchId: filter.branchId },
       filter.page,
       filter.limit,
     );

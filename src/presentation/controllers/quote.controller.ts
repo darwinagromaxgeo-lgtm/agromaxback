@@ -1,4 +1,5 @@
-import { Controller, Get, Post, Patch, Body, Param, Query } from '@nestjs/common';
+import { Controller, Get, Post, Patch, Body, Param, Query, Req } from '@nestjs/common';
+import { BranchScoped } from '../../common/decorators/branch-scoped.decorator';
 import { ApiTags, ApiOperation, ApiBearerAuth } from '@nestjs/swagger';
 import { CreateQuoteUseCase } from '../../application/use-cases/quote/create-quote.use-case';
 import { GetQuotesUseCase } from '../../application/use-cases/quote/get-quotes.use-case';
@@ -11,6 +12,7 @@ import { QuoteStatus } from '../../domain/entities/quote.entity';
 @ApiTags('Quotes')
 @ApiBearerAuth('JWT')
 @Controller('quotes')
+@BranchScoped()
 export class QuoteController {
   constructor(
     private readonly createQuote: CreateQuoteUseCase,
@@ -21,8 +23,8 @@ export class QuoteController {
 
   @Post()
   @ApiOperation({ summary: 'Crear proforma' })
-  async create(@Body() dto: CreateQuoteDto, @CurrentUser('id') userId: string) {
-    return this.createQuote.execute(dto, userId);
+  async create(@Body() dto: CreateQuoteDto, @CurrentUser('id') userId: string, @Req() req: any) {
+    return this.createQuote.execute(dto, userId, req.branchId);
   }
 
   @Get()

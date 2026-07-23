@@ -1,4 +1,5 @@
 import { Controller, Get, Post, Body, Param, Query, UploadedFile, UseInterceptors, BadRequestException, Inject } from '@nestjs/common';
+import { BranchScoped } from '../../common/decorators/branch-scoped.decorator';
 import { FileInterceptor } from '@nestjs/platform-express';
 import { memoryStorage } from 'multer';
 import { ApiTags, ApiOperation, ApiBearerAuth, ApiParam, ApiQuery } from '@nestjs/swagger';
@@ -15,6 +16,7 @@ import { IAccountPayableRepository, ACCOUNT_PAYABLE_REPOSITORY } from '../../dom
 @ApiTags('Accounts Payable')
 @ApiBearerAuth('JWT')
 @Controller('accounts-payable')
+@BranchScoped()
 export class AccountPayableController {
   constructor(
     private readonly getAllAP: GetAllAccountsPayableUseCase,

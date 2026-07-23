@@ -45,6 +45,7 @@ export type PurchaseReceptionStatus = 'PENDING' | 'PARTIAL' | 'RECEIVED';
 
 export interface PurchaseEntity {
   id?: string;
+  branchId?: string;
   companyId: string;
   supplier: string;
   items: PurchaseItemEntity[];

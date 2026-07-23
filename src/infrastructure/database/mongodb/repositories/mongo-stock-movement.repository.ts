@@ -15,6 +15,7 @@ export class MongoStockMovementRepository implements IStockMovementRepository {
     const created = await this.model.create({
       product: movement.productId,
       company: movement.companyId,
+      branch: movement.branchId || undefined,
       movementType: movement.movementType,
       quantity: movement.quantity,
       previousStock: movement.previousStock,
@@ -32,6 +33,7 @@ export class MongoStockMovementRepository implements IStockMovementRepository {
     filter?: {
       productId?: string;
       companyId?: string;
+      branchId?: string;
       movementType?: string;
       startDate?: Date;
       endDate?: Date;
@@ -42,6 +44,7 @@ export class MongoStockMovementRepository implements IStockMovementRepository {
     const query: any = {};
     if (filter?.productId) query.product = filter.productId;
     if (filter?.companyId) query.company = filter.companyId;
+    if (filter?.branchId) query.branch = filter.branchId;
     if (filter?.movementType) query.movementType = filter.movementType;
     if (filter?.startDate || filter?.endDate) {
       query.date = {};
@@ -72,6 +75,7 @@ export class MongoStockMovementRepository implements IStockMovementRepository {
       productId: doc.product?._id?.toString() || doc.product?.toString(),
       productName: doc.product?.name,
       companyId: doc.company?._id?.toString() || doc.company?.toString(),
+      branchId: doc.branch?._id?.toString() || doc.branch?.toString(),
       movementType: doc.movementType,
       quantity: doc.quantity,
       previousStock: doc.previousStock,

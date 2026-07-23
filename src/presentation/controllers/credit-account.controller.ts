@@ -1,4 +1,5 @@
 import { Controller, Get, Post, Patch, Delete, Body, Param, Query, Inject, ParseFloatPipe } from '@nestjs/common';
+import { BranchScoped } from '../../common/decorators/branch-scoped.decorator';
 import { ApiTags, ApiOperation, ApiBearerAuth, ApiParam, ApiQuery } from '@nestjs/swagger';
 import { GetAllCreditsUseCase } from '../../application/use-cases/credit-account/get-all-credits.use-case';
 import { GetClientCreditsUseCase } from '../../application/use-cases/credit-account/get-client-credits.use-case';
@@ -23,6 +24,7 @@ import { ICreditAccountRepository, CREDIT_ACCOUNT_REPOSITORY } from '../../domai
 @ApiTags('Credits')
 @ApiBearerAuth('JWT')
 @Controller('credits')
+@BranchScoped()
 export class CreditAccountController {
   constructor(
     private readonly getAllCredits: GetAllCreditsUseCase,

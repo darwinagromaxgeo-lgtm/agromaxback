@@ -12,9 +12,9 @@ export class MongoQuoteRepository implements IQuoteRepository {
     @InjectModel(QuoteCounterDocument.name) private readonly counterModel: Model<QuoteCounterDoc>,
   ) {}
 
-  async nextSequence(series: string): Promise<number> {
+  async nextSequence(series: string, branchId: string): Promise<number> {
     const doc = await this.counterModel.findOneAndUpdate(
-      { series },
+      { series, branch: new Types.ObjectId(branchId) },
       { $inc: { seq: 1 } },
       { new: true, upsert: true },
     ).lean().exec();
@@ -43,15 +43,17 @@ export class MongoQuoteRepository implements IQuoteRepository {
       issueDate: quote.issueDate,
       validUntil: quote.validUntil,
       createdBy: quote.createdBy ? new Types.ObjectId(quote.createdBy) : undefined,
+      branch: quote.branchId ? new Types.ObjectId(quote.branchId) : undefined,
     });
     return this.toEntity(created.toObject());
   }
 
   async findAll(
-    filter?: { status?: QuoteStatus; clientId?: string; startDate?: Date; endDate?: Date },
+    filter?: { branchId?: string; status?: QuoteStatus; clientId?: string; startDate?: Date; endDate?: Date },
     page = 1, limit = 20,
   ): Promise<{ data: QuoteEntity[]; total: number }> {
     const query: any = {};
+    if (filter?.branchId) query.branch = new Types.ObjectId(filter.branchId);
     if (filter?.status) query.status = filter.status;
     if (filter?.clientId) query.client = new Types.ObjectId(filter.clientId);
     if (filter?.startDate || filter?.endDate) {
@@ -66,21 +68,26 @@ export class MongoQuoteRepository implements IQuoteRepository {
     return { data: data.map((d) => this.toEntity(d)), total };
   }
 
-  async findById(id: string): Promise<QuoteEntity | null> {
-    const doc = await this.quoteModel.findById(id).populate('items.product').populate('client').lean().exec();
+  async findById(id: string, branchId?: string): Promise<QuoteEntity | null> {
+    const query: any = { _id: id };
+    if (branchId) query.branch = new Types.ObjectId(branchId);
+    const doc = await this.quoteModel.findOne(query).populate('items.product').populate('client').lean().exec();
     return doc ? this.toEntity(doc) : null;
   }
 
-  async updateStatus(id: string, status: QuoteStatus, convertedSaleId?: string): Promise<QuoteEntity | null> {
+  async updateStatus(id: string, status: QuoteStatus, convertedSaleId?: string, branchId?: string): Promise<QuoteEntity | null> {
     const update: any = { status };
     if (convertedSaleId) update.convertedSaleId = new Types.ObjectId(convertedSaleId);
-    const doc = await this.quoteModel.findByIdAndUpdate(id, update, { new: true }).lean().exec();
+    const query: any = { _id: id };
+    if (branchId) query.branch = new Types.ObjectId(branchId);
+    const doc = await this.quoteModel.findOneAndUpdate(query, update, { new: true }).lean().exec();
     return doc ? this.toEntity(doc) : null;
   }
 
   private toEntity(doc: any): QuoteEntity {
     return {
       id: doc._id.toString(),
+      branchId: doc.branch?.toString(),
       series: doc.series,
       number: doc.number,
       quoteNumber: doc.quoteNumber,

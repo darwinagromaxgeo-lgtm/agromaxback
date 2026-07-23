@@ -25,5 +25,6 @@ import { UserController } from '../presentation/controllers/user.controller';
     ChangePasswordUseCase,
     ToggleUserStatusUseCase,
   ],
+  exports: [USER_REPOSITORY],
 })
 export class UserModule {}

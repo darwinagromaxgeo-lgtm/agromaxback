@@ -1,4 +1,5 @@
 import { Controller, Get, Post, Patch, Delete, Body, Param, Query, Inject } from '@nestjs/common';
+import { BranchScoped } from '../../common/decorators/branch-scoped.decorator';
 import { ApiTags, ApiOperation, ApiBearerAuth, ApiParam, ApiQuery } from '@nestjs/swagger';
 import { OpenCashRegisterUseCase } from '../../application/use-cases/cash-register/open-cash-register.use-case';
 import { AddEntryUseCase } from '../../application/use-cases/cash-register/add-entry.use-case';
@@ -22,6 +23,7 @@ import { getTodayDateString } from '../../shared/utils/date.util';
 @ApiTags('Cash Register')
 @ApiBearerAuth('JWT')
 @Controller('cash-registers')
+@BranchScoped()
 export class CashRegisterController {
   constructor(
     private readonly openCashRegister: OpenCashRegisterUseCase,

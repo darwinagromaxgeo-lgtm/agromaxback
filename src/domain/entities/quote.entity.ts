@@ -11,6 +11,7 @@ export type QuoteStatus = 'PENDING' | 'ACCEPTED' | 'REJECTED' | 'EXPIRED' | 'CON
 
 export interface QuoteEntity {
   id?: string;
+  branchId?: string;
   quoteNumber?: string;
   series?: string;
   number?: number;

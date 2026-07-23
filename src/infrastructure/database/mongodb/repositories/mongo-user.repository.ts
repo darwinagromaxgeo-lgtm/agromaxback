@@ -12,7 +12,13 @@ export class MongoUserRepository implements IUserRepository {
   ) {}
 
   async create(user: UserEntity): Promise<UserEntity> {
-    const created = await this.userModel.create(user);
+    const created = await this.userModel.create({
+      ...user,
+      branchAssignments: (user.branchAssignments || []).map((assignment) => ({
+        branch: assignment.branchId,
+        role: assignment.role,
+      })),
+    });
     return this.toEntity(created.toObject());
   }
 
@@ -32,7 +38,7 @@ export class MongoUserRepository implements IUserRepository {
   }
 
   async findAll(
-    filter?: { search?: string; role?: string; isActive?: boolean },
+    filter?: { search?: string; role?: string; isActive?: boolean; branchId?: string },
     page = 1,
     limit = 20,
   ): Promise<{ data: UserEntity[]; total: number }> {
@@ -46,6 +52,7 @@ export class MongoUserRepository implements IUserRepository {
     }
     if (filter?.role) query.role = filter.role;
     if (filter?.isActive !== undefined) query.isActive = filter.isActive;
+    if (filter?.branchId) query['branchAssignments.branch'] = filter.branchId;
 
     const [data, total] = await Promise.all([
       this.userModel.find(query).select('-password').skip((page - 1) * limit).limit(limit).sort({ createdAt: -1 }).lean().exec(),
@@ -55,7 +62,14 @@ export class MongoUserRepository implements IUserRepository {
   }
 
   async update(id: string, data: Partial<UserEntity>): Promise<UserEntity> {
-    const doc = await this.userModel.findByIdAndUpdate(id, data, { new: true }).lean().exec();
+    const update: any = { ...data };
+    if (data.branchAssignments !== undefined) {
+      update.branchAssignments = data.branchAssignments.map((assignment) => ({
+        branch: assignment.branchId,
+        role: assignment.role,
+      }));
+    }
+    const doc = await this.userModel.findByIdAndUpdate(id, update, { new: true }).lean().exec();
     return this.toEntity(doc);
   }
 
@@ -63,6 +77,10 @@ export class MongoUserRepository implements IUserRepository {
     return {
       id: doc._id.toString(), username: doc.username || doc.email, email: doc.email,
       password: doc.password, fullName: doc.fullName, role: doc.role, isActive: doc.isActive,
+      branchAssignments: (doc.branchAssignments || []).map((assignment: any) => ({
+        branchId: assignment.branch?._id?.toString() || assignment.branch?.toString(),
+        role: assignment.role,
+      })),
       createdAt: doc.createdAt, updatedAt: doc.updatedAt,
     };
   }

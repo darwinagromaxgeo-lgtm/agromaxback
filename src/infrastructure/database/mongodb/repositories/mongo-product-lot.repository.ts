@@ -15,6 +15,7 @@ export class MongoProductLotRepository implements IProductLotRepository {
     const created = await this.lotModel.create({
       product: new Types.ObjectId(lot.productId),
       company: new Types.ObjectId(lot.companyId),
+      branch: lot.branchId ? new Types.ObjectId(lot.branchId) : undefined,
       lotNumber: lot.lotNumber,
       expirationDate: lot.expirationDate,
       initialQuantity: lot.initialQuantity,
@@ -26,51 +27,58 @@ export class MongoProductLotRepository implements IProductLotRepository {
     return this.toEntity(created.toObject());
   }
 
-  async findByProductCompanyLot(productId: string, companyId: string, lotNumber: string): Promise<ProductLotEntity | null> {
-    const doc = await this.lotModel.findOne({
+  async findByProductCompanyLot(productId: string, companyId: string, lotNumber: string, branchId?: string): Promise<ProductLotEntity | null> {
+    const query: any = {
       product: new Types.ObjectId(productId),
       company: new Types.ObjectId(companyId),
       lotNumber,
-    }).lean().exec();
+    };
+    if (branchId) query.branch = new Types.ObjectId(branchId);
+    const doc = await this.lotModel.findOne(query).lean().exec();
     return doc ? this.toEntity(doc) : null;
   }
 
-  async findByProductAndCompany(productId: string, companyId: string, activeOnly = true): Promise<ProductLotEntity[]> {
+  async findByProductAndCompany(productId: string, companyId: string, activeOnly = true, branchId?: string): Promise<ProductLotEntity[]> {
     const query: any = {
       product: new Types.ObjectId(productId),
       company: new Types.ObjectId(companyId),
     };
+    if (branchId) query.branch = new Types.ObjectId(branchId);
     if (activeOnly) query.isActive = true;
     const docs = await this.lotModel.find(query).sort({ expirationDate: 1, receivedAt: 1 }).lean().exec();
     return docs.map((d) => this.toEntity(d));
   }
 
-  async findByProduct(productId: string, activeOnly = false): Promise<ProductLotEntity[]> {
+  async findByProduct(productId: string, activeOnly = false, branchId?: string): Promise<ProductLotEntity[]> {
     const query: any = { product: new Types.ObjectId(productId) };
+    if (branchId) query.branch = new Types.ObjectId(branchId);
     if (activeOnly) query.isActive = true;
     const docs = await this.lotModel.find(query).sort({ expirationDate: 1, receivedAt: 1 }).lean().exec();
     return docs.map((d) => this.toEntity(d));
   }
 
-  async findByCompany(companyId: string, activeOnly = true): Promise<ProductLotEntity[]> {
+  async findByCompany(companyId: string, activeOnly = true, branchId?: string): Promise<ProductLotEntity[]> {
     const query: any = { company: new Types.ObjectId(companyId) };
+    if (branchId) query.branch = new Types.ObjectId(branchId);
     if (activeOnly) query.isActive = true;
     const docs = await this.lotModel.find(query).populate('product').sort({ expirationDate: 1 }).lean().exec();
     return docs.map((d) => this.toEntity(d));
   }
 
-  async findExpiring(companyId: string, withinDays: number): Promise<ProductLotEntity[]> {
+  async findExpiring(companyId: string, withinDays: number, branchId?: string): Promise<ProductLotEntity[]> {
     // Use start of today UTC so a lot expiring "today" is still considered non-expired
     const now = new Date();
     now.setUTCHours(0, 0, 0, 0);
     const limit = new Date(now);
     limit.setUTCDate(limit.getUTCDate() + withinDays);
-    const docs = await this.lotModel.find({
+    const query: any = {
       company: new Types.ObjectId(companyId),
       isActive: true,
       currentQuantity: { $gt: 0 },
       expirationDate: { $gte: now, $lte: limit },
-    }).populate('product').sort({ expirationDate: 1 }).lean().exec();
+    };
+    if (branchId) query.branch = new Types.ObjectId(branchId);
+    const docs = await this.lotModel.find(query).populate('product').sort({ expirationDate: 1 }).lean().exec();
     return docs.map((d) => this.toEntity(d));
   }
 
@@ -79,14 +87,16 @@ export class MongoProductLotRepository implements IProductLotRepository {
     return doc ? this.toEntity(doc) : null;
   }
 
-  async findExpiredWithStock(): Promise<ProductLotEntity[]> {
+  async findExpiredWithStock(branchId?: string): Promise<ProductLotEntity[]> {
     const today = new Date();
     today.setUTCHours(0, 0, 0, 0);
-    const docs = await this.lotModel.find({
+    const query: any = {
       expirationDate: { $lt: today },
       currentQuantity: { $gt: 0 },
       isActive: true,
-    }).lean().exec();
+    };
+    if (branchId) query.branch = new Types.ObjectId(branchId);
+    const docs = await this.lotModel.find(query).lean().exec();
     return docs.map((d) => this.toEntity(d));
   }
 
@@ -166,6 +176,7 @@ export class MongoProductLotRepository implements IProductLotRepository {
       id: doc._id.toString(),
       productId: doc.product?._id?.toString() || doc.product?.toString(),
       companyId: doc.company?.toString(),
+      branchId: doc.branch?._id?.toString() || doc.branch?.toString(),
       lotNumber: doc.lotNumber,
       expirationDate: doc.expirationDate,
       initialQuantity: doc.initialQuantity,

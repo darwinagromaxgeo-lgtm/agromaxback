@@ -1,5 +1,6 @@
 import { Prop, Schema, SchemaFactory } from '@nestjs/mongoose';
 import { Document, Types } from 'mongoose';
+import { applyBranchScope } from '../branch-scope.plugin';
 
 @Schema({ _id: false })
 export class QuoteItemSubdoc {
@@ -26,13 +27,16 @@ export const QuoteItemSubdocSchema = SchemaFactory.createForClass(QuoteItemSubdo
 
 @Schema({ timestamps: true, collection: 'quotes' })
 export class QuoteDocument {
+  @Prop({ type: Types.ObjectId, ref: 'BranchDocument', required: true })
+  branch: Types.ObjectId;
+
   @Prop({ required: true })
   series: string;
 
   @Prop({ required: true })
   number: number;
 
-  @Prop({ required: true, unique: true })
+  @Prop({ required: true })
   quoteNumber: string;
 
   @Prop({ type: Types.ObjectId, ref: 'CompanyDocument' })
@@ -71,14 +75,19 @@ export class QuoteDocument {
 
 export type QuoteDoc = QuoteDocument & Document;
 export const QuoteSchema = SchemaFactory.createForClass(QuoteDocument);
+applyBranchScope(QuoteSchema);
 
-QuoteSchema.index({ series: 1, number: 1 }, { unique: true });
+QuoteSchema.index({ branch: 1, series: 1, number: 1 }, { unique: true });
+QuoteSchema.index({ branch: 1, quoteNumber: 1 }, { unique: true });
 QuoteSchema.index({ status: 1, validUntil: 1 });
 QuoteSchema.index({ issueDate: -1 });
 
 @Schema({ collection: 'quote_counters' })
 export class QuoteCounterDocument {
-  @Prop({ required: true, unique: true })
+  @Prop({ type: Types.ObjectId, ref: 'BranchDocument', required: true })
+  branch: Types.ObjectId;
+
+  @Prop({ required: true })
   series: string;
 
   @Prop({ required: true, default: 0 })
@@ -87,3 +96,5 @@ export class QuoteCounterDocument {
 
 export type QuoteCounterDoc = QuoteCounterDocument & Document;
 export const QuoteCounterSchema = SchemaFactory.createForClass(QuoteCounterDocument);
+applyBranchScope(QuoteCounterSchema);
+QuoteCounterSchema.index({ branch: 1, series: 1 }, { unique: true });

@@ -1,5 +1,6 @@
 import { Prop, Schema, SchemaFactory } from '@nestjs/mongoose';
 import { Document, Types } from 'mongoose';
+import { applyBranchScope } from '../branch-scope.plugin';
 
 @Schema({ _id: false })
 export class LoanItemSubdoc {
@@ -51,6 +52,9 @@ export const LoanReturnSubdocSchema = SchemaFactory.createForClass(LoanReturnSub
 
 @Schema({ timestamps: true, collection: 'loans' })
 export class LoanDocument {
+  @Prop({ type: Types.ObjectId, ref: 'BranchDocument', required: true })
+  branch: Types.ObjectId;
+
   @Prop({ required: true })
   borrowerName: string;
 
@@ -75,6 +79,7 @@ export class LoanDocument {
 
 export type LoanDoc = LoanDocument & Document;
 export const LoanSchema = SchemaFactory.createForClass(LoanDocument);
+applyBranchScope(LoanSchema);
 
-LoanSchema.index({ borrowerName: 1, status: 1 });
-LoanSchema.index({ date: -1 });
+LoanSchema.index({ branch: 1, borrowerName: 1, status: 1 });
+LoanSchema.index({ branch: 1, date: -1 });

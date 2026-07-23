@@ -1,4 +1,13 @@
-import { IsEmail, IsString, MinLength, IsOptional, IsIn } from 'class-validator';
+import { IsArray, IsEmail, IsString, MinLength, IsOptional, IsIn, IsMongoId, ValidateNested } from 'class-validator';
+import { Type } from 'class-transformer';
+
+export class UserBranchAssignmentDto {
+  @IsMongoId()
+  branchId: string;
+
+  @IsIn(['BRANCH_ADMIN', 'VENDEDOR', 'CAJERO', 'ALMACENERO', 'CONTABILIDAD'])
+  role: string;
+}
 
 export class CreateUserDto {
   @IsString()
@@ -19,6 +28,12 @@ export class CreateUserDto {
 
   @IsOptional()
   @IsString()
-  @IsIn(['ADMIN', 'VENDEDOR'])
+  @IsIn(['ADMIN', 'BRANCH_ADMIN', 'VENDEDOR', 'CAJERO', 'ALMACENERO', 'CONTABILIDAD'])
   role?: string;
+
+  @IsOptional()
+  @IsArray()
+  @ValidateNested({ each: true })
+  @Type(() => UserBranchAssignmentDto)
+  branchAssignments?: UserBranchAssignmentDto[];
 }

@@ -1,6 +1,7 @@
 export interface ProductPrice {
   priceTierId: string;
   companyId?: string;
+  branchId?: string;
   price: number;
 }
 

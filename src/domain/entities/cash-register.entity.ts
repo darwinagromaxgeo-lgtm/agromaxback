@@ -35,6 +35,7 @@ export interface OpeningBalanceAdjustment {
 
 export interface CashRegisterEntity {
   id?: string;
+  branchId?: string;
   date: string;
   openingBalance: number;
   openingBalanceHistory?: OpeningBalanceAdjustment[];

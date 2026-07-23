@@ -15,6 +15,7 @@ export class MongoStockAdjustmentRepository implements IStockAdjustmentRepositor
     const created = await this.model.create({
       product: adjustment.productId,
       company: adjustment.companyId,
+      branch: adjustment.branchId || undefined,
       type: adjustment.type,
       quantity: adjustment.quantity,
       reason: adjustment.reason,
@@ -27,12 +28,13 @@ export class MongoStockAdjustmentRepository implements IStockAdjustmentRepositor
   }
 
   async findAll(
-    filter?: { productId?: string; companyId?: string; startDate?: Date; endDate?: Date },
+    filter?: { productId?: string; companyId?: string; branchId?: string; startDate?: Date; endDate?: Date },
     page = 1, limit = 20,
   ): Promise<{ data: StockAdjustmentEntity[]; total: number }> {
     const query: any = {};
     if (filter?.productId) query.product = filter.productId;
     if (filter?.companyId) query.company = filter.companyId;
+    if (filter?.branchId) query.branch = filter.branchId;
     if (filter?.startDate || filter?.endDate) {
       query.date = {};
       if (filter.startDate) query.date.$gte = filter.startDate;
@@ -50,6 +52,7 @@ export class MongoStockAdjustmentRepository implements IStockAdjustmentRepositor
       id: doc._id.toString(),
       productId: doc.product?._id?.toString() || doc.product?.toString(),
       companyId: doc.company?._id?.toString() || doc.company?.toString(),
+      branchId: doc.branch?._id?.toString() || doc.branch?.toString(),
       type: doc.type,
       quantity: doc.quantity,
       reason: doc.reason,

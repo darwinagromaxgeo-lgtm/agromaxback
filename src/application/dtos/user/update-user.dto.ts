@@ -1,4 +1,6 @@
-import { IsString, IsOptional, MinLength, IsIn, IsEmail } from 'class-validator';
+import { IsArray, IsString, IsOptional, MinLength, IsIn, IsEmail, ValidateNested } from 'class-validator';
+import { Type } from 'class-transformer';
+import { UserBranchAssignmentDto } from './create-user.dto';
 
 export class UpdateUserDto {
   @IsOptional()
@@ -8,7 +10,7 @@ export class UpdateUserDto {
 
   @IsOptional()
   @IsString()
-  @IsIn(['ADMIN', 'VENDEDOR'])
+  @IsIn(['ADMIN', 'BRANCH_ADMIN', 'VENDEDOR', 'CAJERO', 'ALMACENERO', 'CONTABILIDAD'])
   role?: string;
 
   @IsOptional()
@@ -19,4 +21,10 @@ export class UpdateUserDto {
   @IsOptional()
   @IsEmail()
   email?: string;
+
+  @IsOptional()
+  @IsArray()
+  @ValidateNested({ each: true })
+  @Type(() => UserBranchAssignmentDto)
+  branchAssignments?: UserBranchAssignmentDto[];
 }

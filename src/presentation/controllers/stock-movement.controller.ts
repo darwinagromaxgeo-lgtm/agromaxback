@@ -1,4 +1,5 @@
 import { Controller, Get, Query } from '@nestjs/common';
+import { BranchScoped } from '../../common/decorators/branch-scoped.decorator';
 import { ApiTags, ApiOperation, ApiBearerAuth } from '@nestjs/swagger';
 import { GetStockMovementsUseCase } from '../../application/use-cases/stock-movement/get-stock-movements.use-case';
 import { FilterStockMovementDto } from '../../application/dtos/stock-movement/filter-stock-movement.dto';
@@ -6,6 +7,7 @@ import { FilterStockMovementDto } from '../../application/dtos/stock-movement/fi
 @ApiTags('Kardex')
 @ApiBearerAuth('JWT')
 @Controller('stock-movements')
+@BranchScoped()
 export class StockMovementController {
   constructor(
     private readonly getStockMovements: GetStockMovementsUseCase,
