@@ -38,6 +38,18 @@ export class MongoStockRepository implements IStockRepository {
     return docs.map((d) => this.toEntity(d));
   }
 
+  async findAcrossBranches(productId: string, companyId: string): Promise<StockEntity[]> {
+    const docs = await this.stockModel
+      .find({
+        product: new Types.ObjectId(productId),
+        company: new Types.ObjectId(companyId),
+      })
+      .setOptions({ skipBranchScope: true } as any)
+      .lean()
+      .exec();
+    return docs.map((doc) => this.toEntity(doc));
+  }
+
   async upsert(productId: string, companyId: string, quantityChange: number, branchId?: string): Promise<StockEntity> {
     // Buscar primero el documento existente
     const query: any = {
@@ -86,6 +98,20 @@ export class MongoStockRepository implements IStockRepository {
       ],
       { new: true },
     ).lean().exec();
+    return doc ? this.toEntity(doc) : null;
+  }
+
+  async decrementIfAvailable(productId: string, companyId: string, quantity: number, branchId: string): Promise<StockEntity | null> {
+    const doc = await this.stockModel.findOneAndUpdate(
+      {
+        product: new Types.ObjectId(productId),
+        company: new Types.ObjectId(companyId),
+        branch: new Types.ObjectId(branchId),
+        quantity: { $gte: quantity },
+      },
+      { $inc: { quantity: -quantity }, $set: { lastUpdated: new Date() } },
+      { new: true },
+    ).setOptions({ skipBranchScope: true } as any).lean().exec();
     return doc ? this.toEntity(doc) : null;
   }
 

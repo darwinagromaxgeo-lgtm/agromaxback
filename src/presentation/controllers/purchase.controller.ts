@@ -19,6 +19,7 @@ import { Inject } from '@nestjs/common';
 import { IPurchaseRepository, PURCHASE_REPOSITORY } from '../../domain/repositories/purchase.repository';
 import { IAccountPayableRepository, ACCOUNT_PAYABLE_REPOSITORY } from '../../domain/repositories/account-payable.repository';
 import { Roles } from '../../common/decorators/roles.decorator';
+import { CurrentBranch } from '../../common/decorators/current-branch.decorator';
 
 @ApiTags('Purchases')
 @ApiBearerAuth('JWT')
@@ -39,8 +40,12 @@ export class PurchaseController {
 
   @Post()
   @ApiOperation({ summary: 'Registrar compra' })
-  async create(@Body() dto: CreatePurchaseDto, @CurrentUser('id') userId: string) {
-    return this.registerPurchase.execute(dto, userId);
+  async create(
+    @Body() dto: CreatePurchaseDto,
+    @CurrentUser('id') userId: string,
+    @CurrentBranch('id') branchId: string,
+  ) {
+    return this.registerPurchase.execute(dto, userId, branchId);
   }
 
   @Get()
@@ -75,8 +80,13 @@ export class PurchaseController {
 
   @Patch(':id/items')
   @ApiOperation({ summary: 'Editar o agregar productos a una compra existente' })
-  async editItems(@Param('id') id: string, @Body() dto: EditPurchaseItemsDto, @CurrentUser('id') userId: string) {
-    return this.editPurchaseItemsUC.execute(id, dto, userId);
+  async editItems(
+    @Param('id') id: string,
+    @Body() dto: EditPurchaseItemsDto,
+    @CurrentUser('id') userId: string,
+    @CurrentBranch('id') branchId: string,
+  ) {
+    return this.editPurchaseItemsUC.execute(id, dto, userId, branchId);
   }
 
   @Patch(':id/remision-guia')

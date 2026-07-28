@@ -5,6 +5,7 @@ import { StockMovementEntity } from '../../../domain/entities/stock-movement.ent
 export interface RecordMovementParams {
   productId: string;
   companyId: string;
+  branchId?: string;
   movementType: string;
   quantity: number;
   previousStock: number;
@@ -26,6 +27,7 @@ export class RecordStockMovementUseCase {
     return this.movementRepository.create({
       productId: params.productId,
       companyId: params.companyId,
+      branchId: params.branchId,
       movementType: params.movementType,
       quantity: params.quantity,
       previousStock: params.previousStock,

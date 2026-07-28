@@ -21,7 +21,12 @@ export class EditPurchaseItemsUseCase {
     private readonly upsertProductLot: UpsertProductLotUseCase,
   ) {}
 
-  async execute(purchaseId: string, dto: EditPurchaseItemsDto, userId?: string) {
+  async execute(
+    purchaseId: string,
+    dto: EditPurchaseItemsDto,
+    userId?: string,
+    branchId?: string,
+  ) {
     const purchase = await this.purchaseRepository.findById(purchaseId);
     if (!purchase) throw new NotFoundException('Compra no encontrada');
 
@@ -136,7 +141,7 @@ export class EditPurchaseItemsUseCase {
       }
 
       await this.purchaseRepository.updateItem(purchaseId, edit.productId, patch);
-      if (product) await this.syncProductPricing(product, companyId, pricing, priceTiers);
+      if (product) await this.syncProductPricing(product, companyId, pricing, priceTiers, branchId);
     }
 
     // ── Additions of new items ───────────────────────────────────────────────
@@ -182,7 +187,7 @@ export class EditPurchaseItemsUseCase {
       };
 
       await this.purchaseRepository.addItem(purchaseId, newItem);
-      if (product) await this.syncProductPricing(product, companyId, pricing, priceTiers);
+      if (product) await this.syncProductPricing(product, companyId, pricing, priceTiers, branchId);
 
       if (isReceived) {
         const currentStock = await this.stockRepository.findByProductAndCompany(addition.productId, companyId);
@@ -299,12 +304,27 @@ export class EditPurchaseItemsUseCase {
     }
   }
 
-  private async syncProductPricing(product: any, companyId: string, pricing: any, tiers: any[]) {
+  private async syncProductPricing(
+    product: any,
+    companyId: string,
+    pricing: any,
+    tiers: any[],
+    branchId?: string,
+  ) {
     let prices = [...(product.prices || [])];
     const upsert = (tierId: string | undefined, price: number | undefined) => {
       if (!tierId || !price) return;
-      const index = prices.findIndex((p: any) => p.priceTierId === tierId && p.companyId === companyId);
-      const value = { priceTierId: tierId, companyId, price };
+      const index = prices.findIndex((p: any) =>
+        p.priceTierId === tierId
+        && p.companyId === companyId
+        && (p.branchId || undefined) === branchId,
+      );
+      const value = {
+        priceTierId: tierId,
+        companyId,
+        ...(branchId ? { branchId } : {}),
+        price,
+      };
       if (index >= 0) prices[index] = value;
       else prices.push(value);
     };

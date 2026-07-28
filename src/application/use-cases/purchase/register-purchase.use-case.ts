@@ -10,12 +10,27 @@ import { RecordStockMovementUseCase } from '../stock-movement/record-stock-movem
 import { CreateAccountPayableUseCase } from '../account-payable/create-account-payable.use-case';
 import { UpsertProductLotUseCase } from '../product-lot/upsert-product-lot.use-case';
 
-type ProductPrice = { priceTierId: string; companyId?: string; price: number };
+type ProductPrice = { priceTierId: string; companyId?: string; branchId?: string; price: number };
 
-function upsertPrice(prices: ProductPrice[], tierId: string, companyId: string, price: number): ProductPrice[] {
-  const idx = prices.findIndex((p) => p.priceTierId === tierId && p.companyId === companyId);
+function upsertPrice(
+  prices: ProductPrice[],
+  tierId: string,
+  companyId: string,
+  branchId: string | undefined,
+  price: number,
+): ProductPrice[] {
+  const idx = prices.findIndex((p) =>
+    p.priceTierId === tierId
+    && p.companyId === companyId
+    && (p.branchId || undefined) === branchId,
+  );
   if (idx >= 0) return prices.map((p, i) => (i === idx ? { ...p, price } : p));
-  return [...prices, { priceTierId: tierId, companyId, price }];
+  return [...prices, {
+    priceTierId: tierId,
+    companyId,
+    ...(branchId ? { branchId } : {}),
+    price,
+  }];
 }
 
 @Injectable()
@@ -30,7 +45,7 @@ export class RegisterPurchaseUseCase {
     private readonly upsertProductLot: UpsertProductLotUseCase,
   ) {}
 
-  async execute(dto: CreatePurchaseDto, userId?: string) {
+  async execute(dto: CreatePurchaseDto, userId?: string, branchId?: string) {
     const isUsdPurchase = dto.totalCostUsd != null && dto.exchangeRate != null;
     let roundedTotal: number;
     let items = dto.items || [];
@@ -140,11 +155,11 @@ export class RegisterPurchaseUseCase {
           let prices: ProductPrice[] = [...product.prices];
           if (dto.companyId) {
             if (item.precioVenta && mayoristaTier?.id)
-              prices = upsertPrice(prices, mayoristaTier.id, dto.companyId, item.precioVenta);
+              prices = upsertPrice(prices, mayoristaTier.id, dto.companyId, branchId, item.precioVenta);
             if (item.precioMinorista && minoristaTier?.id)
-              prices = upsertPrice(prices, minoristaTier.id, dto.companyId, item.precioMinorista);
+              prices = upsertPrice(prices, minoristaTier.id, dto.companyId, branchId, item.precioMinorista);
             if (item.precioEspecial && especialTier?.id)
-              prices = upsertPrice(prices, especialTier.id, dto.companyId, item.precioEspecial);
+              prices = upsertPrice(prices, especialTier.id, dto.companyId, branchId, item.precioEspecial);
           }
 
           const normalizedItem: any = normalizedItems.find((i: any) => i.productId === item.productId);
