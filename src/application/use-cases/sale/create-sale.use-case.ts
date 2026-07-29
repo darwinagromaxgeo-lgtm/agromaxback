@@ -12,6 +12,11 @@ import { AddEntryUseCase } from '../cash-register/add-entry.use-case';
 import { CreateCreditAccountUseCase } from '../credit-account/create-credit-account.use-case';
 import { AddSaleToCreditUseCase } from '../credit-account/add-sale-to-credit.use-case';
 import { RecordStockMovementUseCase } from '../stock-movement/record-stock-movement.use-case';
+import { CLIENT_REPOSITORY, IClientRepository } from '../../../domain/repositories/client.repository';
+import {
+  CREDIT_ACCOUNT_REPOSITORY,
+  ICreditAccountRepository,
+} from '../../../domain/repositories/credit-account.repository';
 
 @Injectable()
 export class CreateSaleUseCase {
@@ -21,6 +26,9 @@ export class CreateSaleUseCase {
     @Inject(PRODUCT_REPOSITORY) private readonly productRepository: IProductRepository,
     @Inject(PRODUCT_LOT_REPOSITORY) private readonly lotRepository: IProductLotRepository,
     @Inject(PAYMENT_METHOD_REPOSITORY) private readonly paymentMethodRepository: IPaymentMethodRepository,
+    @Inject(CLIENT_REPOSITORY) private readonly clientRepository: IClientRepository,
+    @Inject(CREDIT_ACCOUNT_REPOSITORY)
+    private readonly creditRepository: ICreditAccountRepository,
     private readonly openCashRegister: OpenCashRegisterUseCase,
     private readonly addCashEntry: AddEntryUseCase,
     private readonly createCreditAccount: CreateCreditAccountUseCase,
@@ -28,7 +36,8 @@ export class CreateSaleUseCase {
     private readonly recordStockMovement: RecordStockMovementUseCase,
   ) {}
 
-  async execute(dto: CreateSaleDto, userId?: string) {
+  async execute(dto: CreateSaleDto, userId?: string, branchId?: string) {
+    if (!branchId) throw new BadRequestException('Selecciona una sucursal para registrar la venta');
     const isCredit = dto.isCredit || false;
 
     if (isCredit && !dto.clientId) {
@@ -41,6 +50,26 @@ export class CreateSaleUseCase {
 
     if (!isCredit && (!dto.payments || dto.payments.length === 0)) {
       throw new BadRequestException('Se requiere al menos un método de pago para ventas inmediatas');
+    }
+
+    if (dto.clientId) {
+      const client = await this.clientRepository.findById(dto.clientId);
+      if (!client || client.branchId !== branchId) {
+        throw new BadRequestException('El cliente no pertenece a la sucursal activa');
+      }
+    }
+
+    if (dto.creditAccountId) {
+      const credit = await this.creditRepository.findById(dto.creditAccountId);
+      if (!credit) {
+        throw new BadRequestException('Cuenta de crédito no encontrada en la sucursal activa');
+      }
+      if (credit.status === 'PAID') {
+        throw new BadRequestException('La cuenta de crédito ya está completamente pagada');
+      }
+      if (credit.clientId !== dto.clientId) {
+        throw new BadRequestException('La cuenta de crédito no pertenece al cliente seleccionado');
+      }
     }
 
     const stockSnapshots: Map<string, number> = new Map();
@@ -97,6 +126,7 @@ export class CreateSaleUseCase {
     }
 
     const sale = await this.saleRepository.create({
+      branchId,
       companyId: dto.companyId,
       clientId: dto.clientId,
       items,
@@ -171,7 +201,14 @@ export class CreateSaleUseCase {
       if (dto.creditAccountId) {
         await this.addSaleToCredit.execute(dto.creditAccountId, sale.id!, roundedTotal);
       } else {
-        await this.createCreditAccount.execute(dto.clientId!, sale.id!, roundedTotal, userId, dto.creditName);
+        await this.createCreditAccount.execute(
+          dto.clientId!,
+          sale.id!,
+          roundedTotal,
+          userId,
+          dto.creditName,
+          branchId,
+        );
       }
     }
 

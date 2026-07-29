@@ -6,11 +6,19 @@ import { CreateClientDto } from '../../dtos/client/create-client.dto';
 export class CreateClientUseCase {
   constructor(@Inject(CLIENT_REPOSITORY) private readonly clientRepository: IClientRepository) {}
 
-  async execute(dto: CreateClientDto) {
-    if (dto.documentNumber) {
-      const existing = await this.clientRepository.findByDocumentNumber(dto.documentNumber);
-      if (existing) throw new ConflictException('El número de documento ya está registrado');
+  async execute(dto: CreateClientDto, branchId: string) {
+    const documentNumber = dto.documentNumber?.trim() || undefined;
+    if (documentNumber) {
+      const existing = await this.clientRepository.findByDocumentNumber(documentNumber);
+      if (existing) {
+        throw new ConflictException('El número de documento ya está registrado en esta sucursal');
+      }
     }
-    return this.clientRepository.create({ ...dto, isActive: true });
+    return this.clientRepository.create({
+      ...dto,
+      documentNumber,
+      branchId,
+      isActive: true,
+    });
   }
 }

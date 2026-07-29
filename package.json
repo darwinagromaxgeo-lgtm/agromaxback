@@ -7,6 +7,7 @@
     "dev": "nest start --watch",
     "start": "node dist/main",
     "start:prod": "node dist/main",
+    "migrate:branch-clients": "node --env-file-if-exists=.env scripts/migrate-branch-clients.js",
     "seed": "ts-node src/infrastructure/database/seeders/seed.ts"
   },
   "dependencies": {

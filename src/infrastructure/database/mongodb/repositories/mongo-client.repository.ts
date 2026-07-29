@@ -1,6 +1,6 @@
 import { Injectable } from '@nestjs/common';
 import { InjectModel } from '@nestjs/mongoose';
-import { Model } from 'mongoose';
+import { Model, Types } from 'mongoose';
 import { IClientRepository } from '../../../../domain/repositories/client.repository';
 import { ClientEntity } from '../../../../domain/entities/client.entity';
 import { ClientDocument, ClientDoc } from '../schemas/client.schema';
@@ -12,7 +12,15 @@ export class MongoClientRepository implements IClientRepository {
   ) {}
 
   async create(client: ClientEntity): Promise<ClientEntity> {
-    const created = await this.clientModel.create(client);
+    const created = await this.clientModel.create({
+      branch: new Types.ObjectId(client.branchId),
+      name: client.name.trim(),
+      documentNumber: client.documentNumber?.trim() || undefined,
+      phone: client.phone,
+      email: client.email,
+      address: client.address,
+      isActive: client.isActive,
+    });
     return this.toEntity(created.toObject());
   }
 
@@ -41,7 +49,31 @@ export class MongoClientRepository implements IClientRepository {
   }
 
   async update(id: string, client: Partial<ClientEntity>): Promise<ClientEntity | null> {
-    const doc = await this.clientModel.findByIdAndUpdate(id, client, { new: true }).lean().exec();
+    const update: Record<string, any> = { ...client };
+    delete update.id;
+    delete update.branchId;
+
+    const unset: Record<string, 1> = {};
+    if (Object.prototype.hasOwnProperty.call(update, 'documentNumber')) {
+      update.documentNumber = update.documentNumber?.trim();
+      if (!update.documentNumber) {
+        delete update.documentNumber;
+        unset.documentNumber = 1;
+      }
+    }
+    if (typeof update.name === 'string') update.name = update.name.trim();
+
+    const doc = await this.clientModel
+      .findByIdAndUpdate(
+        id,
+        {
+          ...(Object.keys(update).length ? { $set: update } : {}),
+          ...(Object.keys(unset).length ? { $unset: unset } : {}),
+        },
+        { new: true },
+      )
+      .lean()
+      .exec();
     return doc ? this.toEntity(doc) : null;
   }
 
@@ -52,7 +84,9 @@ export class MongoClientRepository implements IClientRepository {
 
   private toEntity(doc: any): ClientEntity {
     return {
-      id: doc._id.toString(), name: doc.name, documentNumber: doc.documentNumber,
+      id: doc._id.toString(),
+      branchId: doc.branch?._id?.toString() || doc.branch?.toString(),
+      name: doc.name, documentNumber: doc.documentNumber,
       phone: doc.phone, email: doc.email, address: doc.address,
       isActive: doc.isActive, createdAt: doc.createdAt, updatedAt: doc.updatedAt,
     };

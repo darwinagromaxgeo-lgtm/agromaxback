@@ -10,7 +10,12 @@ export class ConvertQuoteToSaleUseCase {
     private readonly createSale: CreateSaleUseCase,
   ) {}
 
-  async execute(quoteId: string, saleDto: Omit<CreateSaleDto, 'items'>, userId?: string) {
+  async execute(
+    quoteId: string,
+    saleDto: Omit<CreateSaleDto, 'items'>,
+    userId?: string,
+    branchId?: string,
+  ) {
     const quote = await this.quoteRepository.findById(quoteId);
     if (!quote) throw new NotFoundException('Proforma no encontrada');
     if (quote.status === 'CONVERTED') throw new BadRequestException('Esta proforma ya fue convertida en venta');
@@ -26,7 +31,7 @@ export class ConvertQuoteToSaleUseCase {
         priceTier: i.priceTier,
         unitPrice: i.unitPrice,
       })),
-    } as CreateSaleDto, userId);
+    } as CreateSaleDto, userId, branchId);
 
     await this.quoteRepository.updateStatus(quoteId, 'CONVERTED', sale.id);
     return sale;

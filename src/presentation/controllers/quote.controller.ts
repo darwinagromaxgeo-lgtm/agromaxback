@@ -8,6 +8,7 @@ import { ConvertQuoteToSaleUseCase } from '../../application/use-cases/quote/con
 import { CreateQuoteDto } from '../../application/dtos/quote/create-quote.dto';
 import { CurrentUser } from '../../common/decorators/current-user.decorator';
 import { QuoteStatus } from '../../domain/entities/quote.entity';
+import { CurrentBranch } from '../../common/decorators/current-branch.decorator';
 
 @ApiTags('Quotes')
 @ApiBearerAuth('JWT')
@@ -61,7 +62,12 @@ export class QuoteController {
 
   @Post(':id/convert')
   @ApiOperation({ summary: 'Convertir proforma en venta' })
-  async convert(@Param('id') id: string, @Body() body: any, @CurrentUser('id') userId: string) {
-    return this.convertToSale.execute(id, body, userId);
+  async convert(
+    @Param('id') id: string,
+    @Body() body: any,
+    @CurrentUser('id') userId: string,
+    @CurrentBranch('id') branchId: string,
+  ) {
+    return this.convertToSale.execute(id, body, userId, branchId);
   }
 }

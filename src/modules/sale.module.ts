@@ -11,16 +11,16 @@ import { SaleController } from '../presentation/controllers/sale.controller';
 import { StockModule } from './stock.module';
 import { CashRegisterModule } from './cash-register.module';
 import { CreditAccountModule } from './credit-account.module';
-import { AddSaleToCreditUseCase } from '../application/use-cases/credit-account/add-sale-to-credit.use-case';
 import { ProductModule } from './product.module';
 import { StockMovementModule } from './stock-movement.module';
 import { PaymentMethodModule } from './payment-method.module';
 import { ProductLotModule } from './product-lot.module';
+import { ClientModule } from './client.module';
 
 @Module({
-  imports: [MongooseModule.forFeature([{ name: SaleDocument.name, schema: SaleSchema }]), StockModule, forwardRef(() => CashRegisterModule), CreditAccountModule, ProductModule, StockMovementModule, PaymentMethodModule, ProductLotModule],
+  imports: [MongooseModule.forFeature([{ name: SaleDocument.name, schema: SaleSchema }]), StockModule, forwardRef(() => CashRegisterModule), CreditAccountModule, ProductModule, StockMovementModule, PaymentMethodModule, ProductLotModule, ClientModule],
   controllers: [SaleController],
-  providers: [{ provide: SALE_REPOSITORY, useClass: MongoSaleRepository }, CreateSaleUseCase, GetSalesUseCase, CancelSaleUseCase, UpdateVoucherUseCase, AddSaleToCreditUseCase],
+  providers: [{ provide: SALE_REPOSITORY, useClass: MongoSaleRepository }, CreateSaleUseCase, GetSalesUseCase, CancelSaleUseCase, UpdateVoucherUseCase],
   exports: [SALE_REPOSITORY, CreateSaleUseCase],
 })
 export class SaleModule {}

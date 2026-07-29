@@ -5,12 +5,18 @@ import { MongoClientRepository } from '../infrastructure/database/mongodb/reposi
 import { CLIENT_REPOSITORY } from '../domain/repositories/client.repository';
 import { CreateClientUseCase } from '../application/use-cases/client/create-client.use-case';
 import { GetClientsUseCase } from '../application/use-cases/client/get-clients.use-case';
+import { UpdateClientUseCase } from '../application/use-cases/client/update-client.use-case';
 import { ClientController } from '../presentation/controllers/client.controller';
 
 @Module({
   imports: [MongooseModule.forFeature([{ name: ClientDocument.name, schema: ClientSchema }])],
   controllers: [ClientController],
-  providers: [{ provide: CLIENT_REPOSITORY, useClass: MongoClientRepository }, CreateClientUseCase, GetClientsUseCase],
+  providers: [
+    { provide: CLIENT_REPOSITORY, useClass: MongoClientRepository },
+    CreateClientUseCase,
+    GetClientsUseCase,
+    UpdateClientUseCase,
+  ],
   exports: [CLIENT_REPOSITORY],
 })
 export class ClientModule {}

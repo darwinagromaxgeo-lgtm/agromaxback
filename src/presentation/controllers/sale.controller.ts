@@ -10,6 +10,7 @@ import { FilterSaleDto } from '../../application/dtos/sale/filter-sale.dto';
 import { CancelSaleDto } from '../../application/dtos/sale/cancel-sale.dto';
 import { UpdateVoucherDto } from '../../application/dtos/sale/update-voucher.dto';
 import { CurrentUser } from '../../common/decorators/current-user.decorator';
+import { CurrentBranch } from '../../common/decorators/current-branch.decorator';
 
 @ApiTags('Sales')
 @ApiBearerAuth('JWT')
@@ -25,7 +26,13 @@ export class SaleController {
 
   @Post()
   @ApiOperation({ summary: 'Registrar venta', description: 'Crea una venta (mixta multi-empresa). Descuenta stock, registra en caja (efectivo) o crea credito (credito)' })
-  async create(@Body() dto: CreateSaleDto, @CurrentUser('id') userId: string) { return this.createSale.execute(dto, userId); }
+  async create(
+    @Body() dto: CreateSaleDto,
+    @CurrentUser('id') userId: string,
+    @CurrentBranch('id') branchId: string,
+  ) {
+    return this.createSale.execute(dto, userId, branchId);
+  }
 
   @Get()
   @ApiOperation({ summary: 'Listar ventas', description: 'Obtiene lista paginada de ventas con filtros opcionales' })

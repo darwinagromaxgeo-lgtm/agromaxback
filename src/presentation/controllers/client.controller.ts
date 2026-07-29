@@ -1,25 +1,33 @@
-import { Controller, Get, Post, Put, Body, Param, Query, Inject } from '@nestjs/common';
+import { Controller, Get, Post, Put, Body, Param, Query } from '@nestjs/common';
 import { ApiTags, ApiOperation, ApiBearerAuth, ApiParam } from '@nestjs/swagger';
 import { CreateClientUseCase } from '../../application/use-cases/client/create-client.use-case';
 import { GetClientsUseCase } from '../../application/use-cases/client/get-clients.use-case';
+import { UpdateClientUseCase } from '../../application/use-cases/client/update-client.use-case';
 import { CreateClientDto } from '../../application/dtos/client/create-client.dto';
 import { UpdateClientDto } from '../../application/dtos/client/update-client.dto';
 import { PaginationDto } from '../../application/dtos/common/pagination.dto';
-import { IClientRepository, CLIENT_REPOSITORY } from '../../domain/repositories/client.repository';
+import { BranchScoped } from '../../common/decorators/branch-scoped.decorator';
+import { CurrentBranch } from '../../common/decorators/current-branch.decorator';
 
 @ApiTags('Clients')
 @ApiBearerAuth('JWT')
 @Controller('clients')
+@BranchScoped()
 export class ClientController {
   constructor(
     private readonly createClient: CreateClientUseCase,
     private readonly getClients: GetClientsUseCase,
-    @Inject(CLIENT_REPOSITORY) private readonly clientRepository: IClientRepository,
+    private readonly updateClient: UpdateClientUseCase,
   ) {}
 
   @Post()
   @ApiOperation({ summary: 'Crear cliente', description: 'Registra un nuevo cliente en el sistema' })
-  async create(@Body() dto: CreateClientDto) { return this.createClient.execute(dto); }
+  async create(
+    @Body() dto: CreateClientDto,
+    @CurrentBranch('id') branchId: string,
+  ) {
+    return this.createClient.execute(dto, branchId);
+  }
 
   @Get()
   @ApiOperation({ summary: 'Listar clientes', description: 'Obtiene lista paginada de clientes' })
@@ -28,5 +36,7 @@ export class ClientController {
   @Put(':id')
   @ApiOperation({ summary: 'Actualizar cliente', description: 'Modifica los datos de un cliente existente' })
   @ApiParam({ name: 'id', description: 'ID del cliente' })
-  async update(@Param('id') id: string, @Body() dto: UpdateClientDto) { return this.clientRepository.update(id, dto); }
+  async update(@Param('id') id: string, @Body() dto: UpdateClientDto) {
+    return this.updateClient.execute(id, dto);
+  }
 }

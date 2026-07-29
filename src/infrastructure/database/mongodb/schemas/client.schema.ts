@@ -1,12 +1,16 @@
 import { Prop, Schema, SchemaFactory } from '@nestjs/mongoose';
-import { Document } from 'mongoose';
+import { Document, Types } from 'mongoose';
+import { applyBranchScope } from '../branch-scope.plugin';
 
 @Schema({ timestamps: true, collection: 'clients' })
 export class ClientDocument {
+  @Prop({ type: Types.ObjectId, ref: 'BranchDocument', required: true })
+  branch: Types.ObjectId;
+
   @Prop({ required: true })
   name: string;
 
-  @Prop({ unique: true, sparse: true })
+  @Prop({ trim: true })
   documentNumber: string;
 
   @Prop()
@@ -24,5 +28,13 @@ export class ClientDocument {
 
 export type ClientDoc = ClientDocument & Document;
 export const ClientSchema = SchemaFactory.createForClass(ClientDocument);
+applyBranchScope(ClientSchema);
 
-ClientSchema.index({ name: 1 });
+ClientSchema.index({ branch: 1, name: 1 });
+ClientSchema.index(
+  { branch: 1, documentNumber: 1 },
+  {
+    unique: true,
+    partialFilterExpression: { documentNumber: { $type: 'string', $gt: '' } },
+  },
+);

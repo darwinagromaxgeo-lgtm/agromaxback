@@ -13,6 +13,7 @@ export class MongoSaleRepository implements ISaleRepository {
 
   async create(sale: SaleEntity): Promise<SaleEntity> {
     const created = await this.saleModel.create({
+      branch: sale.branchId || undefined,
       company: sale.companyId || undefined,
       client: sale.clientId || undefined,
       items: sale.items.map((i) => ({
@@ -127,6 +128,7 @@ export class MongoSaleRepository implements ISaleRepository {
 
     return {
       id: doc._id.toString(),
+      branchId: doc.branch?._id?.toString() || doc.branch?.toString(),
       companyId: doc.company?._id?.toString() || doc.company?.toString(),
       clientId: doc.client?._id?.toString() || doc.client?.toString(),
       items: (doc.items || []).map((i: any) => ({

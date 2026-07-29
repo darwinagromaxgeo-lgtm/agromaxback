@@ -1,5 +1,6 @@
 export interface ClientEntity {
   id?: string;
+  branchId: string;
   name: string;
   documentNumber?: string;
   phone?: string;

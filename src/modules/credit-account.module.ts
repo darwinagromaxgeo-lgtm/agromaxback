@@ -28,6 +28,6 @@ import { ProductModule } from './product.module';
     { provide: CREDIT_ACCOUNT_REPOSITORY, useClass: MongoCreditAccountRepository },
     CreateCreditAccountUseCase, RegisterPaymentUseCase, RegisterBatchPaymentUseCase, GetClientCreditsUseCase, GetAllCreditsUseCase, EditCreditUseCase, DeleteCreditUseCase, AddSaleToCreditUseCase,
   ],
-  exports: [CREDIT_ACCOUNT_REPOSITORY, CreateCreditAccountUseCase],
+  exports: [CREDIT_ACCOUNT_REPOSITORY, CreateCreditAccountUseCase, AddSaleToCreditUseCase],
 })
 export class CreditAccountModule {}

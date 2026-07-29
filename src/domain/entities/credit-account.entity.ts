@@ -27,6 +27,7 @@ export interface CreditSaleDetail {
 
 export interface CreditAccountEntity {
   id?: string;
+  branchId: string;
   clientId: string;
   name?: string;
   saleIds: string[];

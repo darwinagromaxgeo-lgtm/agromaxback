@@ -54,6 +54,7 @@ export class MongoCreditAccountRepository implements ICreditAccountRepository {
 
   async create(credit: CreditAccountEntity): Promise<CreditAccountEntity> {
     const created = await this.model.create({
+      branch: credit.branchId,
       client: credit.clientId,
       name: credit.name,
       sales: credit.saleIds || [],
@@ -192,6 +193,7 @@ export class MongoCreditAccountRepository implements ICreditAccountRepository {
     const salesArr: any[] = Array.isArray(doc.sales) ? doc.sales : [];
     return {
       id: doc._id.toString(),
+      branchId: doc.branch?._id?.toString() || doc.branch?.toString(),
       clientId: doc.client?._id?.toString() || doc.client?.toString(),
       name: doc.name,
       saleIds: salesArr.map((s: any) => (s?._id?.toString() || s?.toString())),

@@ -1,4 +1,4 @@
-import { Injectable, Inject } from '@nestjs/common';
+import { BadRequestException, Injectable, Inject } from '@nestjs/common';
 import { ICreditAccountRepository, CREDIT_ACCOUNT_REPOSITORY } from '../../../domain/repositories/credit-account.repository';
 
 @Injectable()
@@ -7,8 +7,17 @@ export class CreateCreditAccountUseCase {
     @Inject(CREDIT_ACCOUNT_REPOSITORY) private readonly creditRepository: ICreditAccountRepository,
   ) {}
 
-  async execute(clientId: string, saleId: string, totalAmount: number, userId?: string, name?: string) {
+  async execute(
+    clientId: string,
+    saleId: string,
+    totalAmount: number,
+    userId?: string,
+    name?: string,
+    branchId?: string,
+  ) {
+    if (!branchId) throw new BadRequestException('Selecciona una sucursal para crear el crédito');
     return this.creditRepository.create({
+      branchId,
       clientId,
       name,
       saleIds: [saleId],

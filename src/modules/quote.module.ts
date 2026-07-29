@@ -9,6 +9,7 @@ import { UpdateQuoteStatusUseCase } from '../application/use-cases/quote/update-
 import { ConvertQuoteToSaleUseCase } from '../application/use-cases/quote/convert-quote-to-sale.use-case';
 import { QuoteController } from '../presentation/controllers/quote.controller';
 import { SaleModule } from './sale.module';
+import { ClientModule } from './client.module';
 
 @Module({
   imports: [
@@ -17,6 +18,7 @@ import { SaleModule } from './sale.module';
       { name: QuoteCounterDocument.name, schema: QuoteCounterSchema },
     ]),
     SaleModule,
+    ClientModule,
   ],
   controllers: [QuoteController],
   providers: [
