@@ -3,6 +3,7 @@ import { AppModule } from './app.module';
 import { ConfigService } from '@nestjs/config';
 import { validationPipe } from './presentation/pipes/validation.pipe';
 import { DocumentBuilder, SwaggerModule } from '@nestjs/swagger';
+import { allowedCorsOrigins } from './infrastructure/config/cors.config';
 import { connect } from 'mongoose';
 import * as bcrypt from 'bcryptjs';
 
@@ -47,9 +48,7 @@ async function bootstrap() {
   const configService = app.get(ConfigService);
   app.setGlobalPrefix('api');
   app.useGlobalPipes(validationPipe);
-  const allowedOrigins = process.env.CORS_ORIGINS
-    ? process.env.CORS_ORIGINS.split(',')
-    : ['http://localhost:5173', 'http://localhost:5174', 'http://localhost:5175'];
+  const allowedOrigins = allowedCorsOrigins();
   app.enableCors({ origin: allowedOrigins, credentials: true });
 
   const swaggerConfig = new DocumentBuilder()
