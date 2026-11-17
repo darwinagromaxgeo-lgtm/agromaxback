@@ -1,5 +1,5 @@
 import { Prop, Schema, SchemaFactory } from '@nestjs/mongoose';
-import { Document, Types } from 'mongoose';
+import { Document, Schema as MongooseSchema, Types } from 'mongoose';
 import { applyBranchScope } from '../branch-scope.plugin';
 
 @Schema({ _id: false })
@@ -13,7 +13,7 @@ export class EditHistorySubdoc {
   @Prop({ required: true })
   reason: string;
 
-  @Prop({ type: Types.ObjectId, ref: 'UserDocument' })
+  @Prop({ type: MongooseSchema.Types.ObjectId, ref: 'UserDocument' })
   editedBy: Types.ObjectId;
 
   @Prop({ default: Date.now })
@@ -36,7 +36,7 @@ export class CashRegisterEntrySubdoc {
   @Prop({ required: true })
   amount: number;
 
-  @Prop({ type: Types.ObjectId })
+  @Prop({ type: MongooseSchema.Types.ObjectId })
   referenceId: Types.ObjectId;
 
   @Prop()
@@ -54,7 +54,7 @@ export class CashRegisterEntrySubdoc {
   @Prop({ default: false })
   isDeleted: boolean;
 
-  @Prop({ type: Types.ObjectId, ref: 'UserDocument' })
+  @Prop({ type: MongooseSchema.Types.ObjectId, ref: 'UserDocument' })
   deletedBy: Types.ObjectId;
 
   @Prop()
@@ -75,7 +75,7 @@ export class CashRegisterEntrySubdoc {
   })
   remisionGuia?: { serie: string; correlativo: string; fecha: Date };
 
-  @Prop({ type: Types.ObjectId, ref: 'UserDocument' })
+  @Prop({ type: MongooseSchema.Types.ObjectId, ref: 'UserDocument' })
   createdBy: Types.ObjectId;
 }
 
@@ -83,7 +83,7 @@ export const CashRegisterEntrySubdocSchema = SchemaFactory.createForClass(CashRe
 
 @Schema({ timestamps: true, collection: 'cash_registers' })
 export class CashRegisterDocument {
-  @Prop({ type: Types.ObjectId, ref: 'BranchDocument', required: true })
+  @Prop({ type: MongooseSchema.Types.ObjectId, ref: 'BranchDocument', required: true })
   branch: Types.ObjectId;
 
   @Prop({ required: true })
@@ -98,7 +98,7 @@ export class CashRegisterDocument {
         previousAmount: { type: Number, required: true },
         newAmount: { type: Number, required: true },
         reason: { type: String, required: true },
-        adjustedBy: { type: Types.ObjectId, ref: 'UserDocument' },
+        adjustedBy: { type: MongooseSchema.Types.ObjectId, ref: 'UserDocument' },
         adjustedAt: { type: Date, required: true },
       },
     ],
@@ -121,7 +121,7 @@ export class CashRegisterDocument {
   @Prop()
   closingBalance: number;
 
-  @Prop({ type: Types.ObjectId, ref: 'UserDocument' })
+  @Prop({ type: MongooseSchema.Types.ObjectId, ref: 'UserDocument' })
   closedBy: Types.ObjectId;
 
   @Prop()
@@ -130,7 +130,7 @@ export class CashRegisterDocument {
   @Prop()
   notes: string;
 
-  @Prop({ type: Types.ObjectId, ref: 'UserDocument' })
+  @Prop({ type: MongooseSchema.Types.ObjectId, ref: 'UserDocument' })
   createdBy: Types.ObjectId;
 }
 

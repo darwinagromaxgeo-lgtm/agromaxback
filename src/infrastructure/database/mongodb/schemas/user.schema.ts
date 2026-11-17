@@ -1,9 +1,9 @@
 import { Prop, Schema, SchemaFactory } from '@nestjs/mongoose';
-import { Document, Types } from 'mongoose';
+import { Document, Schema as MongooseSchema, Types } from 'mongoose';
 
 @Schema({ _id: false })
 export class UserBranchAssignmentSubdoc {
-  @Prop({ type: Types.ObjectId, ref: 'BranchDocument', required: true })
+  @Prop({ type: MongooseSchema.Types.ObjectId, ref: 'BranchDocument', required: true })
   branch: Types.ObjectId;
 
   @Prop({ required: true })

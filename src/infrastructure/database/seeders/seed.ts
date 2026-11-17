@@ -73,6 +73,21 @@ async function seed() {
     updatedAt: now,
   });
 
+  // Operational records require a branch, including the demo inventory.
+  const branchesCollection = db.collection('branches');
+  await branchesCollection.updateOne({ code: 'DEMO' }, { $setOnInsert: {
+    code: 'DEMO',
+    name: 'Sucursal demo',
+    companies: [company._id],
+    defaultCompany: company._id,
+    isActive: true,
+    isMain: true,
+    createdAt: now,
+    updatedAt: now,
+  } }, { upsert: true });
+  const branch = await branchesCollection.findOne({ code: 'DEMO' });
+  if (!branch) throw new Error('No se pudo crear la sucursal de demostración');
+
   // Seed categories
   const categoriesCollection = db.collection('categories');
   const demoCategories = [
@@ -375,11 +390,20 @@ async function seed() {
 
     if (!product?._id) continue;
 
-    const stockExisting = await stocksCollection.findOne({ product: product._id, company: company._id });
+    const demoScope = {
+      product: product._id,
+      company: company._id,
+      $or: [{ branch: branch._id }, { branch: { $exists: false } }],
+    };
+    const stockExisting = await stocksCollection.findOne(demoScope);
+    if (stockExisting && !stockExisting.branch) {
+      await stocksCollection.updateOne({ _id: stockExisting._id }, { $set: { branch: branch._id } });
+    }
     if (!stockExisting) {
       await stocksCollection.insertOne({
         product: product._id,
         company: company._id,
+        branch: branch._id,
         quantity: item.stock,
         lastUpdated: now,
         createdAt: now,
@@ -393,14 +417,17 @@ async function seed() {
 
     if (item.tracksLot) {
       const lotExisting = await lotsCollection.findOne({
-        product: product._id,
-        company: company._id,
+        ...demoScope,
         lotNumber: item.lotNumber,
       });
+      if (lotExisting && !lotExisting.branch) {
+        await lotsCollection.updateOne({ _id: lotExisting._id }, { $set: { branch: branch._id } });
+      }
       if (!lotExisting) {
         await lotsCollection.insertOne({
           product: product._id,
           company: company._id,
+          branch: branch._id,
           lotNumber: item.lotNumber,
           expirationDate,
           initialQuantity: item.stock,
@@ -416,15 +443,18 @@ async function seed() {
     }
 
     const movementExisting = await movementsCollection.findOne({
-      product: product._id,
-      company: company._id,
+      ...demoScope,
       referenceType: 'SeedInitialStock',
       description: 'Stock inicial de prueba',
     });
+    if (movementExisting && !movementExisting.branch) {
+      await movementsCollection.updateOne({ _id: movementExisting._id }, { $set: { branch: branch._id } });
+    }
     if (!movementExisting) {
       await movementsCollection.insertOne({
         product: product._id,
         company: company._id,
+        branch: branch._id,
         movementType: 'ADJUSTMENT_IN',
         quantity: item.stock,
         previousStock: 0,

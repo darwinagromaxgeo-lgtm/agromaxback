@@ -6,6 +6,7 @@ import { DocumentBuilder, SwaggerModule } from '@nestjs/swagger';
 import { allowedCorsOrigins } from './infrastructure/config/cors.config';
 import { connect } from 'mongoose';
 import * as bcrypt from 'bcryptjs';
+import { bootstrapAdminSettings } from './infrastructure/config/bootstrap-admin.config';
 
 async function runSeed() {
   const uri = process.env.MONGODB_URI || 'mongodb://localhost:27017/fertilizantes';
@@ -14,10 +15,11 @@ async function runSeed() {
   const usersCollection = conn.connection.collection('users');
   const existingUsers = await usersCollection.countDocuments();
   if (existingUsers === 0) {
-    const hashedPassword = await bcrypt.hash('admin123', 10);
+    const initialAdmin = bootstrapAdminSettings();
+    const hashedPassword = await bcrypt.hash(initialAdmin.password, 10);
     await usersCollection.insertOne({
-      username: 'admin',
-      email: 'admin@fertilizantes.com',
+      username: initialAdmin.username,
+      email: initialAdmin.email,
       password: hashedPassword,
       fullName: 'Administrador',
       role: 'ADMIN',
@@ -25,7 +27,7 @@ async function runSeed() {
       createdAt: new Date(),
       updatedAt: new Date(),
     });
-    console.log('Admin user seeded (username: admin, password: admin123)');
+    console.log(`Administrador inicial preparado (usuario: ${initialAdmin.username})`);
   }
 
   const priceTiersCollection = conn.connection.collection('price-tiers');
@@ -43,7 +45,7 @@ async function runSeed() {
 }
 
 async function bootstrap() {
-  await runSeed();
+  if (process.env.AGROMAX_SKIP_BOOTSTRAP !== 'true') await runSeed();
   const app = await NestFactory.create(AppModule);
   const configService = app.get(ConfigService);
   app.setGlobalPrefix('api');
@@ -79,7 +81,7 @@ async function bootstrap() {
   expressApp.get('/api/health', (_req: any, res: any) => res.json({ status: 'ok', timestamp: new Date().toISOString() }));
 
   const port = configService.get<number>('app.port') || 3000;
-  await app.listen(port);
+  await app.listen(port, process.env.HOST || '0.0.0.0');
   console.log(`Backend running on http://localhost:${port}/api`);
   console.log(`Swagger docs on http://localhost:${port}/api/docs`);
 }

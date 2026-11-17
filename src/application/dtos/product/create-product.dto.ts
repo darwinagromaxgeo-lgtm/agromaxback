@@ -1,4 +1,4 @@
-import { IsString, IsOptional, IsArray, ValidateNested, IsNumber, Min, IsEnum, IsBoolean } from 'class-validator';
+import { IsString, IsOptional, IsArray, ValidateNested, IsNumber, Min, IsIn, IsBoolean } from 'class-validator';
 import { Type } from 'class-transformer';
 import { IgvTaxType } from '../../../domain/enums';
 
@@ -57,8 +57,8 @@ export class CreateProductDto {
   activeIngredients?: ActiveIngredientItemDto[];
 
   @IsOptional()
-  @IsEnum(IgvTaxType)
-  taxType?: IgvTaxType;
+  @IsIn([...Object.values(IgvTaxType), 'PENDIENTE'])
+  taxType?: IgvTaxType | 'PENDIENTE';
 
   @IsOptional()
   @IsArray()

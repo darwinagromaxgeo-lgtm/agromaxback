@@ -8,6 +8,7 @@ import { StockMovementType } from '../../../domain/enums';
 import { DeleteEntryDto } from '../../dtos/cash-register/delete-entry.dto';
 import { RecordStockMovementUseCase } from '../stock-movement/record-stock-movement.use-case';
 import { getNowInTimezone } from '../../../shared/utils/date.util';
+import { BILLING_DOCUMENT_REPOSITORY, IBillingDocumentRepository } from '../../../domain/repositories/billing-document.repository';
 
 @Injectable()
 export class DeleteEntryUseCase {
@@ -18,6 +19,7 @@ export class DeleteEntryUseCase {
     @Inject(PRODUCT_REPOSITORY) private readonly productRepository: IProductRepository,
     @Inject(CREDIT_ACCOUNT_REPOSITORY) private readonly creditAccountRepository: ICreditAccountRepository,
     private readonly recordStockMovement: RecordStockMovementUseCase,
+    @Inject(BILLING_DOCUMENT_REPOSITORY) private readonly billingDocuments: IBillingDocumentRepository,
   ) {}
 
   async execute(registerId: string, entryId: string, dto: DeleteEntryDto, userId?: string) {
@@ -28,6 +30,9 @@ export class DeleteEntryUseCase {
     const entry = register.entries.find(e => e.id === entryId);
     if (!entry) throw new BadRequestException('Movimiento no encontrado');
     if (entry.isDeleted) throw new BadRequestException('El movimiento ya fue eliminado');
+    if (entry.referenceType === 'Sale' && entry.referenceId && await this.billingDocuments.hasSubmittedSale(entry.referenceId)) {
+      throw new BadRequestException('La venta vinculada tiene un comprobante fiscal enviado. Revisa su situación antes de anular el movimiento');
+    }
 
     // Soft-delete this entry
     await this.cashRegisterRepository.updateEntry(registerId, entryId, {

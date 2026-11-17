@@ -1,13 +1,13 @@
 import { Prop, Schema, SchemaFactory } from '@nestjs/mongoose';
-import { Document, Types } from 'mongoose';
+import { Document, Schema as MongooseSchema, Types } from 'mongoose';
 import { applyBranchScope } from '../branch-scope.plugin';
 
 @Schema({ _id: false })
 export class QuoteItemSubdoc {
-  @Prop({ type: Types.ObjectId, ref: 'ProductDocument', required: true })
+  @Prop({ type: MongooseSchema.Types.ObjectId, ref: 'ProductDocument', required: true })
   product: Types.ObjectId;
 
-  @Prop({ type: Types.ObjectId, ref: 'CompanyDocument', required: true })
+  @Prop({ type: MongooseSchema.Types.ObjectId, ref: 'CompanyDocument', required: true })
   company: Types.ObjectId;
 
   @Prop({ required: true })
@@ -27,7 +27,7 @@ export const QuoteItemSubdocSchema = SchemaFactory.createForClass(QuoteItemSubdo
 
 @Schema({ timestamps: true, collection: 'quotes' })
 export class QuoteDocument {
-  @Prop({ type: Types.ObjectId, ref: 'BranchDocument', required: true })
+  @Prop({ type: MongooseSchema.Types.ObjectId, ref: 'BranchDocument', required: true })
   branch: Types.ObjectId;
 
   @Prop({ required: true })
@@ -39,10 +39,10 @@ export class QuoteDocument {
   @Prop({ required: true })
   quoteNumber: string;
 
-  @Prop({ type: Types.ObjectId, ref: 'CompanyDocument' })
+  @Prop({ type: MongooseSchema.Types.ObjectId, ref: 'CompanyDocument' })
   company: Types.ObjectId;
 
-  @Prop({ type: Types.ObjectId, ref: 'ClientDocument' })
+  @Prop({ type: MongooseSchema.Types.ObjectId, ref: 'ClientDocument' })
   client: Types.ObjectId;
 
   @Prop()
@@ -66,10 +66,10 @@ export class QuoteDocument {
   @Prop({ required: true })
   validUntil: Date;
 
-  @Prop({ type: Types.ObjectId, ref: 'SaleDocument' })
+  @Prop({ type: MongooseSchema.Types.ObjectId, ref: 'SaleDocument' })
   convertedSaleId: Types.ObjectId;
 
-  @Prop({ type: Types.ObjectId, ref: 'UserDocument' })
+  @Prop({ type: MongooseSchema.Types.ObjectId, ref: 'UserDocument' })
   createdBy: Types.ObjectId;
 }
 
@@ -84,7 +84,7 @@ QuoteSchema.index({ issueDate: -1 });
 
 @Schema({ collection: 'quote_counters' })
 export class QuoteCounterDocument {
-  @Prop({ type: Types.ObjectId, ref: 'BranchDocument', required: true })
+  @Prop({ type: MongooseSchema.Types.ObjectId, ref: 'BranchDocument', required: true })
   branch: Types.ObjectId;
 
   @Prop({ required: true })

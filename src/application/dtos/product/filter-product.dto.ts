@@ -10,4 +10,5 @@ export class FilterProductDto extends PaginationDto {
   @IsOptional() @IsString() unit?: string;
   @IsOptional() @IsIn(['asc', 'desc']) sort?: 'asc' | 'desc';
   @IsOptional() @Transform(({ value }) => value === 'true' || value === true) @IsBoolean() isActive?: boolean;
+  @IsOptional() @Transform(({ value }) => value === 'true' || value === true) @IsBoolean() sellableOnly?: boolean;
 }

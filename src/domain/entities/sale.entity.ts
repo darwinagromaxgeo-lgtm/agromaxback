@@ -6,6 +6,9 @@ export interface SaleItemEntity {
   priceTier: string;
   unitPrice: number;
   subtotal: number;
+  unit?: string;
+  taxType?: string;
+  taxRate?: number;
 }
 
 export interface SalePaymentEntity {

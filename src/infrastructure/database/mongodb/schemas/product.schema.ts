@@ -1,5 +1,5 @@
 import { Prop, Schema, SchemaFactory } from '@nestjs/mongoose';
-import { Document, Types } from 'mongoose';
+import { Document, Schema as MongooseSchema, Types } from 'mongoose';
 
 @Schema({ _id: false })
 export class ActiveIngredientSubdoc {
@@ -14,13 +14,13 @@ export const ActiveIngredientSubdocSchema = SchemaFactory.createForClass(ActiveI
 
 @Schema({ _id: false })
 export class ProductPriceSubdoc {
-  @Prop({ type: Types.ObjectId, ref: 'PriceTierDocument', required: true })
+  @Prop({ type: MongooseSchema.Types.ObjectId, ref: 'PriceTierDocument', required: true })
   priceTier: Types.ObjectId;
 
-  @Prop({ type: Types.ObjectId, ref: 'CompanyDocument' })
+  @Prop({ type: MongooseSchema.Types.ObjectId, ref: 'CompanyDocument' })
   company?: Types.ObjectId;
 
-  @Prop({ type: Types.ObjectId, ref: 'BranchDocument' })
+  @Prop({ type: MongooseSchema.Types.ObjectId, ref: 'BranchDocument' })
   branch?: Types.ObjectId;
 
   @Prop({ required: true })
@@ -40,7 +40,7 @@ export class ProductDocument {
   @Prop()
   description: string;
 
-  @Prop({ type: Types.ObjectId, ref: 'CategoryDocument', required: true })
+  @Prop({ type: MongooseSchema.Types.ObjectId, ref: 'CategoryDocument', required: true })
   category: Types.ObjectId;
 
   @Prop({ required: true })
@@ -57,6 +57,12 @@ export class ProductDocument {
 
   @Prop({ default: 'GRAVADO' })
   taxType: string;
+
+  @Prop({ enum: ['READY', 'PENDING_REVIEW'], default: 'READY' })
+  catalogStatus?: string;
+
+  @Prop({ type: Object })
+  catalogImport?: Record<string, unknown>;
 
   @Prop({ default: false })
   tracksLot: boolean;

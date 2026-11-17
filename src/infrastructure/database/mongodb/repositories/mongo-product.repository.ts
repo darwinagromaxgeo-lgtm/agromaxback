@@ -21,6 +21,8 @@ export class MongoProductRepository implements IProductRepository {
       activeIngredient: product.activeIngredient,
       activeIngredients: (product.activeIngredients || []).map(i => ({ name: i.name, concentration: i.concentration || '' })),
       taxType: product.taxType || 'GRAVADO',
+      catalogStatus: product.catalogStatus || 'READY',
+      catalogImport: product.catalogImport,
       prices: product.prices.map((p) => ({ priceTier: p.priceTierId, ...(p.companyId && { company: p.companyId }), ...(p.branchId && { branch: p.branchId }), price: p.price })),
       tracksLot: product.tracksLot ?? false,
       isActive: product.isActive,
@@ -31,13 +33,13 @@ export class MongoProductRepository implements IProductRepository {
   }
 
   async findAll(
-    filter?: { search?: string; category?: string; activeIngredient?: string; control?: string; isActive?: boolean; supplier?: string; unit?: string; sort?: 'asc' | 'desc' },
+    filter?: { search?: string; category?: string; activeIngredient?: string; control?: string; isActive?: boolean; sellableOnly?: boolean; supplier?: string; unit?: string; sort?: 'asc' | 'desc' },
     page = 1,
     limit = 20,
   ): Promise<{ data: ProductEntity[]; total: number }> {
     const query: any = {};
     if (filter?.search) query.name = { $regex: filter.search, $options: 'i' };
-    if (filter?.category) query.category = filter.category;
+    if (filter?.category) query.$expr = { $eq: [{ $toString: '$category' }, filter.category] };
     if (filter?.activeIngredient) {
       query.$or = [
         { 'activeIngredients.name': { $regex: filter.activeIngredient, $options: 'i' } },
@@ -48,9 +50,15 @@ export class MongoProductRepository implements IProductRepository {
     if (filter?.supplier) query.supplier = { $regex: filter.supplier, $options: 'i' };
     if (filter?.unit) query.unit = filter.unit;
     query.isActive = filter?.isActive !== undefined ? filter.isActive : true;
+    if (filter?.sellableOnly) {
+      query.catalogStatus = { $ne: 'PENDING_REVIEW' };
+      query.taxType = { $ne: 'PENDIENTE' };
+    }
 
     const collation = { locale: 'es', strength: 1 };
-    const sortQuery = filter?.sort ? { name: filter.sort === 'asc' ? 1 : -1 } : { createdAt: -1 };
+    const sortQuery = filter?.sort
+      ? { name: filter.sort === 'asc' ? 1 : -1, _id: filter.sort === 'asc' ? 1 : -1 }
+      : { createdAt: -1, _id: -1 };
 
     const [data, total] = await Promise.all([
       this.productModel.find(query).collation(collation).skip((page - 1) * limit).limit(limit).sort(sortQuery as any).lean().exec(),
@@ -104,6 +112,8 @@ export class MongoProductRepository implements IProductRepository {
         ? doc.activeIngredients.map((i: any) => ({ name: i.name, concentration: i.concentration || '' }))
         : doc.activeIngredient ? [{ name: doc.activeIngredient, concentration: '' }] : [],
       taxType: doc.taxType || 'GRAVADO',
+      catalogStatus: doc.catalogStatus || 'READY',
+      catalogImport: doc.catalogImport,
       tracksLot: doc.tracksLot ?? false,
       prices: (doc.prices || []).map((p: any) => ({
         priceTierId: p.priceTier?.toString() || p.priceTier,

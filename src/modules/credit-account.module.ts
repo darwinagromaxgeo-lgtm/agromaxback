@@ -1,4 +1,5 @@
 import { Module, forwardRef } from '@nestjs/common';
+import { BillingPersistenceModule } from './billing-persistence.module';
 import { MongooseModule } from '@nestjs/mongoose';
 import { CreditAccountDocument, CreditAccountSchema } from '../infrastructure/database/mongodb/schemas/credit-account.schema';
 import { SaleDocument, SaleSchema } from '../infrastructure/database/mongodb/schemas/sale.schema';
@@ -22,7 +23,7 @@ import { StockMovementModule } from './stock-movement.module';
 import { ProductModule } from './product.module';
 
 @Module({
-  imports: [MongooseModule.forFeature([{ name: CreditAccountDocument.name, schema: CreditAccountSchema }, { name: SaleDocument.name, schema: SaleSchema }]), forwardRef(() => CashRegisterModule), ClientModule, PaymentMethodModule, forwardRef(() => SaleModule), StockModule, StockMovementModule, ProductModule],
+  imports: [MongooseModule.forFeature([{ name: CreditAccountDocument.name, schema: CreditAccountSchema }, { name: SaleDocument.name, schema: SaleSchema }]), forwardRef(() => CashRegisterModule), ClientModule, PaymentMethodModule, forwardRef(() => SaleModule), StockModule, StockMovementModule, ProductModule, BillingPersistenceModule],
   controllers: [CreditAccountController],
   providers: [
     { provide: CREDIT_ACCOUNT_REPOSITORY, useClass: MongoCreditAccountRepository },

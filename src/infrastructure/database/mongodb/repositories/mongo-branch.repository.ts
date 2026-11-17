@@ -17,6 +17,8 @@ export class MongoBranchRepository implements IBranchRepository {
       name: branch.name.trim(),
       address: branch.address,
       phone: branch.phone,
+      billingSeriesCode: branch.billingSeriesCode,
+      sunatEstablishmentCode: branch.sunatEstablishmentCode,
       companies: branch.companyIds.map((id) => new Types.ObjectId(id)),
       defaultCompany: branch.defaultCompanyId ? new Types.ObjectId(branch.defaultCompanyId) : undefined,
       isActive: branch.isActive,
@@ -64,7 +66,11 @@ export class MongoBranchRepository implements IBranchRepository {
       update.defaultCompany = data.defaultCompanyId ? new Types.ObjectId(data.defaultCompanyId) : null;
       delete update.defaultCompanyId;
     }
-    const doc = await this.model.findByIdAndUpdate(id, { $set: update }, { new: true }).lean().exec();
+    const filter: any = { _id: id };
+    if (data.billingSeriesCode !== undefined) filter.$or = [
+      { billingSeriesCode: { $exists: false } }, { billingSeriesCode: null }, { billingSeriesCode: data.billingSeriesCode },
+    ];
+    const doc = await this.model.findOneAndUpdate(filter, { $set: update }, { new: true, runValidators: true }).lean().exec();
     return doc ? this.toEntity(doc) : null;
   }
 
@@ -75,6 +81,8 @@ export class MongoBranchRepository implements IBranchRepository {
       name: doc.name,
       address: doc.address,
       phone: doc.phone,
+      billingSeriesCode: doc.billingSeriesCode,
+      sunatEstablishmentCode: doc.sunatEstablishmentCode,
       companyIds: (doc.companies || []).map((company: any) => company?._id?.toString() || company.toString()),
       defaultCompanyId: doc.defaultCompany?._id?.toString() || doc.defaultCompany?.toString(),
       isActive: doc.isActive !== false,

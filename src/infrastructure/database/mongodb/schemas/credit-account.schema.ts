@@ -1,5 +1,5 @@
 import { Prop, Schema, SchemaFactory } from '@nestjs/mongoose';
-import { Document, Types } from 'mongoose';
+import { Document, Schema as MongooseSchema, Types } from 'mongoose';
 import { applyBranchScope } from '../branch-scope.plugin';
 
 @Schema({ timestamps: true })
@@ -10,10 +10,10 @@ export class CreditPaymentSubdoc {
   @Prop({ required: true, default: Date.now })
   paymentDate: Date;
 
-  @Prop({ type: Types.ObjectId })
+  @Prop({ type: MongooseSchema.Types.ObjectId })
   cashRegisterEntryId: Types.ObjectId;
 
-  @Prop({ type: Types.ObjectId, ref: 'PaymentMethodDocument' })
+  @Prop({ type: MongooseSchema.Types.ObjectId, ref: 'PaymentMethodDocument' })
   paymentMethod: Types.ObjectId;
 
   @Prop()
@@ -22,7 +22,7 @@ export class CreditPaymentSubdoc {
   @Prop()
   notes: string;
 
-  @Prop({ type: Types.ObjectId, ref: 'UserDocument' })
+  @Prop({ type: MongooseSchema.Types.ObjectId, ref: 'UserDocument' })
   receivedBy: Types.ObjectId;
 }
 
@@ -30,16 +30,16 @@ export const CreditPaymentSubdocSchema = SchemaFactory.createForClass(CreditPaym
 
 @Schema({ timestamps: true, collection: 'credit_accounts' })
 export class CreditAccountDocument {
-  @Prop({ type: Types.ObjectId, ref: 'BranchDocument', required: true })
+  @Prop({ type: MongooseSchema.Types.ObjectId, ref: 'BranchDocument', required: true })
   branch: Types.ObjectId;
 
-  @Prop({ type: Types.ObjectId, ref: 'ClientDocument', required: true })
+  @Prop({ type: MongooseSchema.Types.ObjectId, ref: 'ClientDocument', required: true })
   client: Types.ObjectId;
 
   @Prop()
   name: string;
 
-  @Prop({ type: [{ type: Types.ObjectId, ref: 'SaleDocument' }], default: [] })
+  @Prop({ type: [{ type: MongooseSchema.Types.ObjectId, ref: 'SaleDocument' }], default: [] })
   sales: Types.ObjectId[];
 
   @Prop({ required: true })
@@ -57,7 +57,7 @@ export class CreditAccountDocument {
   @Prop({ type: [CreditPaymentSubdocSchema], default: [] })
   payments: CreditPaymentSubdoc[];
 
-  @Prop({ type: Types.ObjectId, ref: 'UserDocument' })
+  @Prop({ type: MongooseSchema.Types.ObjectId, ref: 'UserDocument' })
   createdBy: Types.ObjectId;
 }
 

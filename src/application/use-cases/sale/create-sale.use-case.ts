@@ -13,6 +13,7 @@ import { CreateCreditAccountUseCase } from '../credit-account/create-credit-acco
 import { AddSaleToCreditUseCase } from '../credit-account/add-sale-to-credit.use-case';
 import { RecordStockMovementUseCase } from '../stock-movement/record-stock-movement.use-case';
 import { CLIENT_REPOSITORY, IClientRepository } from '../../../domain/repositories/client.repository';
+import { ProductEntity } from '../../../domain/entities/product.entity';
 import {
   CREDIT_ACCOUNT_REPOSITORY,
   ICreditAccountRepository,
@@ -73,8 +74,15 @@ export class CreateSaleUseCase {
     }
 
     const stockSnapshots: Map<string, number> = new Map();
+    const productSnapshots = new Map<string, ProductEntity>();
     for (const item of dto.items) {
       const product = await this.productRepository.findById(item.productId);
+      if (!product) throw new BadRequestException('Producto no encontrado');
+      if (product.isActive === false) throw new BadRequestException(`El producto "${product.name}" está desactivado`);
+      if (product.catalogStatus === 'PENDING_REVIEW' || product.taxType === 'PENDIENTE') {
+        throw new BadRequestException(`Completa el precio, la unidad y el IGV del producto "${product.name}" antes de venderlo`);
+      }
+      productSnapshots.set(item.productId, product);
       let available: number;
       if (product?.tracksLot) {
         const lots = await this.lotRepository.findByProductAndCompany(item.productId, item.companyId, true);
@@ -98,6 +106,10 @@ export class CreateSaleUseCase {
       priceTier: item.priceTier,
       unitPrice: item.unitPrice,
       subtotal: Math.round(item.quantity * item.unitPrice * 100) / 100,
+      productName: productSnapshots.get(item.productId)!.name,
+      unit: productSnapshots.get(item.productId)!.unit,
+      taxType: productSnapshots.get(item.productId)!.taxType || 'GRAVADO',
+      taxRate: (productSnapshots.get(item.productId)!.taxType || 'GRAVADO') === 'GRAVADO' ? 0.18 : 0,
     }));
     const total = items.reduce((sum, item) => sum + item.subtotal, 0);
     const roundedTotal = Math.round(total * 100) / 100;

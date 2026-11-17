@@ -1,5 +1,5 @@
 import { Prop, Schema, SchemaFactory } from '@nestjs/mongoose';
-import { Document, Types } from 'mongoose';
+import { Document, Schema as MongooseSchema, Types } from 'mongoose';
 
 @Schema({ timestamps: true, collection: 'categories' })
 export class CategoryDocument {
@@ -12,7 +12,7 @@ export class CategoryDocument {
   @Prop({ default: true })
   isActive: boolean;
 
-  @Prop({ type: Types.ObjectId, ref: 'CategoryDocument', default: null })
+  @Prop({ type: MongooseSchema.Types.ObjectId, ref: 'CategoryDocument', default: null })
   parentId: Types.ObjectId | null;
 }
 

@@ -19,5 +19,7 @@ export class CreateBranchDto {
   companyIds: string[];
 
   @IsOptional() @IsMongoId() defaultCompanyId?: string;
+  @IsOptional() @IsString() @Matches(/^[1-9A-Z]$/) billingSeriesCode?: string;
+  @IsOptional() @IsString() @Matches(/^\d{4}$/) sunatEstablishmentCode?: string;
   @IsOptional() @IsBoolean() isMain?: boolean;
 }

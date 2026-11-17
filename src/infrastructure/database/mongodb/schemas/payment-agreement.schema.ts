@@ -1,5 +1,5 @@
 import { Prop, Schema, SchemaFactory } from '@nestjs/mongoose';
-import { Document, Types } from 'mongoose';
+import { Document, Schema as MongooseSchema, Types } from 'mongoose';
 
 @Schema({ _id: false })
 export class AgreementRemisionGuiaSubdoc {
@@ -32,7 +32,7 @@ export class AgreementPaymentSubdoc {
   @Prop({ required: true }) codigoTransferencia: string;
   @Prop() notes: string;
   @Prop() voucherUrl: string;
-  @Prop({ type: Types.ObjectId, ref: 'UserDocument' }) registeredBy: Types.ObjectId;
+  @Prop({ type: MongooseSchema.Types.ObjectId, ref: 'UserDocument' }) registeredBy: Types.ObjectId;
 }
 
 @Schema({ timestamps: true, collection: 'payment_agreements' })
@@ -56,7 +56,7 @@ export class PaymentAgreementDocument {
   @Prop() cancellationReason: string;
   @Prop() cancelledBy: string;
   @Prop({ type: Date }) cancelledAt: Date;
-  @Prop({ type: Types.ObjectId, ref: 'UserDocument' }) createdBy: Types.ObjectId;
+  @Prop({ type: MongooseSchema.Types.ObjectId, ref: 'UserDocument' }) createdBy: Types.ObjectId;
 }
 
 export type PaymentAgreementDoc = PaymentAgreementDocument & Document;

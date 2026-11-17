@@ -1,16 +1,16 @@
 import { Prop, Schema, SchemaFactory } from '@nestjs/mongoose';
-import { Document, Types } from 'mongoose';
+import { Document, Schema as MongooseSchema, Types } from 'mongoose';
 import { applyBranchScope } from '../branch-scope.plugin';
 
 @Schema({ timestamps: true, collection: 'stock_adjustments' })
 export class StockAdjustmentDocument {
-  @Prop({ type: Types.ObjectId, ref: 'ProductDocument', required: true })
+  @Prop({ type: MongooseSchema.Types.ObjectId, ref: 'ProductDocument', required: true })
   product: Types.ObjectId;
 
-  @Prop({ type: Types.ObjectId, ref: 'CompanyDocument', required: true })
+  @Prop({ type: MongooseSchema.Types.ObjectId, ref: 'CompanyDocument', required: true })
   company: Types.ObjectId;
 
-  @Prop({ type: Types.ObjectId, ref: 'BranchDocument', required: true })
+  @Prop({ type: MongooseSchema.Types.ObjectId, ref: 'BranchDocument', required: true })
   branch: Types.ObjectId;
 
   @Prop({ type: String, enum: ['INCREASE', 'DECREASE'], required: true })
@@ -28,7 +28,7 @@ export class StockAdjustmentDocument {
   @Prop({ required: true })
   newQuantity: number;
 
-  @Prop({ type: Types.ObjectId, ref: 'UserDocument' })
+  @Prop({ type: MongooseSchema.Types.ObjectId, ref: 'UserDocument' })
   adjustedBy: Types.ObjectId;
 
   @Prop({ required: true, default: Date.now })

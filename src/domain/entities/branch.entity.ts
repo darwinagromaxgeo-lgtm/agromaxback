@@ -6,6 +6,8 @@ export interface BranchEntity {
   phone?: string;
   companyIds: string[];
   defaultCompanyId?: string;
+  billingSeriesCode?: string;
+  sunatEstablishmentCode?: string;
   isActive: boolean;
   isMain: boolean;
   createdAt?: Date;

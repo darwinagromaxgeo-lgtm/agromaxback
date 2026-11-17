@@ -16,16 +16,22 @@ export class ManageBranchesUseCase {
       throw new ConflictException('El código de sucursal ya está registrado');
     }
     this.validateDefaultCompany(dto.companyIds, dto.defaultCompanyId);
-    return this.branches.create({
+    await this.validateBillingCode(dto.billingSeriesCode);
+    try { return await this.branches.create({
       code: dto.code,
       name: dto.name,
       address: dto.address,
       phone: dto.phone,
+      billingSeriesCode: dto.billingSeriesCode,
+      sunatEstablishmentCode: dto.sunatEstablishmentCode,
       companyIds: dto.companyIds,
       defaultCompanyId: dto.defaultCompanyId || dto.companyIds[0],
       isActive: true,
       isMain: dto.isMain || false,
-    });
+    }); } catch (error: any) {
+      if (error?.code === 11000) throw new ConflictException('El código de sucursal o de series ya está asignado');
+      throw error;
+    }
   }
 
   list() {
@@ -42,6 +48,10 @@ export class ManageBranchesUseCase {
   async update(id: string, dto: UpdateBranchDto) {
     const existing = await this.branches.findById(id);
     if (!existing) throw new NotFoundException('Sucursal no encontrada');
+    if (existing.billingSeriesCode && dto.billingSeriesCode !== undefined && dto.billingSeriesCode !== existing.billingSeriesCode) {
+      throw new BadRequestException('El código de series asignado se conserva para proteger la numeración fiscal');
+    }
+    await this.validateBillingCode(dto.billingSeriesCode, id);
     if (dto.code && dto.code.toUpperCase() !== existing.code) {
       const duplicate = await this.branches.findByCode(dto.code);
       if (duplicate && duplicate.id !== id) throw new ConflictException('El código de sucursal ya está registrado');
@@ -49,7 +59,22 @@ export class ManageBranchesUseCase {
     const companyIds = dto.companyIds || existing.companyIds;
     const defaultCompanyId = dto.defaultCompanyId || existing.defaultCompanyId;
     this.validateDefaultCompany(companyIds, defaultCompanyId);
-    return this.branches.update(id, dto);
+    try {
+      const updated = await this.branches.update(id, dto);
+      if (!updated) throw new ConflictException('La sucursal cambió durante la edición. Actualiza sus datos');
+      return updated;
+    } catch (error: any) {
+      if (error?.code === 11000) throw new ConflictException('El código de sucursal o de series ya está asignado');
+      throw error;
+    }
+  }
+
+  private async validateBillingCode(code?: string, branchId?: string) {
+    if (!code) return;
+    const branches = await this.branches.findAll(false);
+    if (branches.some(branch => branch.billingSeriesCode === code && branch.id !== branchId)) {
+      throw new ConflictException('El código de series ya pertenece a otra sucursal');
+    }
   }
 
   private validateDefaultCompany(companyIds: string[], defaultCompanyId?: string) {

@@ -32,13 +32,14 @@ import { JwtAuthGuard } from './presentation/guards/jwt-auth.guard';
 import { RolesGuard } from './presentation/guards/roles.guard';
 import { BranchAccessGuard } from './presentation/guards/branch-access.guard';
 import { BranchModule } from './modules/branch.module';
+import { BillingModule } from './modules/billing.module';
 import { HttpExceptionFilter } from './presentation/filters/http-exception.filter';
 import { ResponseTransformInterceptor } from './presentation/interceptors/response-transform.interceptor';
 import { BranchContextInterceptor } from './presentation/interceptors/branch-context.interceptor';
 
 @Module({
   imports: [
-    ConfigModule.forRoot({ isGlobal: true, load: [databaseConfig, appConfig] }),
+    ConfigModule.forRoot({ isGlobal: true, envFilePath: process.env.AGROMAX_ENV_FILE || '.env', load: [databaseConfig, appConfig] }),
     MongooseModule.forRootAsync({
       imports: [ConfigModule],
       useFactory: (configService: ConfigService) => ({ uri: configService.get<string>('database.uri') }),
@@ -46,7 +47,7 @@ import { BranchContextInterceptor } from './presentation/interceptors/branch-con
     }),
     AuthModule, UserModule, BranchModule, CompanyModule, CategoryModule, UnitModule, PriceTierModule, ProductModule, StockModule, PurchaseModule, SaleModule, ClientModule,
     StockAdjustmentModule, CashRegisterModule, CreditAccountModule, DashboardModule, UserModule, StockMovementModule, LoanModule, PaymentMethodModule, AccountPayableModule,
-    LookupModule, SupplierModule, ProductLotModule, QuoteModule, PaymentAgreementsModule,
+    LookupModule, SupplierModule, ProductLotModule, QuoteModule, PaymentAgreementsModule, BillingModule,
   ],
   providers: [
     { provide: APP_GUARD, useClass: JwtAuthGuard },

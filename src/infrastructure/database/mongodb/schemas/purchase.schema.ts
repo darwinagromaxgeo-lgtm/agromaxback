@@ -1,10 +1,10 @@
 import { Prop, Schema, SchemaFactory } from '@nestjs/mongoose';
-import { Document, Types } from 'mongoose';
+import { Document, Schema as MongooseSchema, Types } from 'mongoose';
 import { applyBranchScope } from '../branch-scope.plugin';
 
 @Schema({ _id: false })
 export class PurchaseItemSubdoc {
-  @Prop({ type: Types.ObjectId, ref: 'ProductDocument', required: true })
+  @Prop({ type: MongooseSchema.Types.ObjectId, ref: 'ProductDocument', required: true })
   product: Types.ObjectId;
 
   @Prop({ required: true })
@@ -63,7 +63,7 @@ export const PurchaseItemSubdocSchema = SchemaFactory.createForClass(PurchaseIte
 
 @Schema({ _id: false })
 export class ReceptionItemSubdoc {
-  @Prop({ type: Types.ObjectId, ref: 'ProductDocument', required: true })
+  @Prop({ type: MongooseSchema.Types.ObjectId, ref: 'ProductDocument', required: true })
   product: Types.ObjectId;
 
   @Prop({ required: true })
@@ -77,7 +77,7 @@ export class ReceptionSubdoc {
   @Prop({ required: true, default: Date.now })
   date: Date;
 
-  @Prop({ type: Types.ObjectId, ref: 'UserDocument' })
+  @Prop({ type: MongooseSchema.Types.ObjectId, ref: 'UserDocument' })
   receivedBy: Types.ObjectId;
 
   @Prop()
@@ -91,10 +91,10 @@ export const ReceptionSubdocSchema = SchemaFactory.createForClass(ReceptionSubdo
 
 @Schema({ timestamps: true, collection: 'purchases' })
 export class PurchaseDocument {
-  @Prop({ type: Types.ObjectId, ref: 'BranchDocument', required: true })
+  @Prop({ type: MongooseSchema.Types.ObjectId, ref: 'BranchDocument', required: true })
   branch: Types.ObjectId;
 
-  @Prop({ type: Types.ObjectId, ref: 'CompanyDocument', required: true })
+  @Prop({ type: MongooseSchema.Types.ObjectId, ref: 'CompanyDocument', required: true })
   company: Types.ObjectId;
 
   @Prop({ required: true })
@@ -127,7 +127,7 @@ export class PurchaseDocument {
   @Prop({ type: Date })
   dueDate: Date;
 
-  @Prop({ type: Types.ObjectId, ref: 'SupplierDocument' })
+  @Prop({ type: MongooseSchema.Types.ObjectId, ref: 'SupplierDocument' })
   supplierId: Types.ObjectId;
 
   @Prop()
@@ -163,7 +163,7 @@ export class PurchaseDocument {
   @Prop({ default: false })
   isHistorical: boolean;
 
-  @Prop({ type: Types.ObjectId, ref: 'UserDocument' })
+  @Prop({ type: MongooseSchema.Types.ObjectId, ref: 'UserDocument' })
   createdBy: Types.ObjectId;
 }
 

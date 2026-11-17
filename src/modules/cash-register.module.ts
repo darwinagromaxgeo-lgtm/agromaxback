@@ -1,4 +1,5 @@
 import { Module, forwardRef } from '@nestjs/common';
+import { BillingPersistenceModule } from './billing-persistence.module';
 import { MongooseModule } from '@nestjs/mongoose';
 import { CashRegisterDocument, CashRegisterSchema } from '../infrastructure/database/mongodb/schemas/cash-register.schema';
 import { MongoCashRegisterRepository } from '../infrastructure/database/mongodb/repositories/mongo-cash-register.repository';
@@ -21,7 +22,7 @@ import { StockMovementModule } from './stock-movement.module';
 @Module({
   imports: [
     MongooseModule.forFeature([{ name: CashRegisterDocument.name, schema: CashRegisterSchema }]),
-    forwardRef(() => SaleModule), StockModule, ProductModule, CreditAccountModule, StockMovementModule,
+    forwardRef(() => SaleModule), StockModule, ProductModule, CreditAccountModule, StockMovementModule, BillingPersistenceModule,
   ],
   controllers: [CashRegisterController],
   providers: [

@@ -1,13 +1,13 @@
 import { Prop, Schema, SchemaFactory } from '@nestjs/mongoose';
-import { Document, Types } from 'mongoose';
+import { Document, Schema as MongooseSchema, Types } from 'mongoose';
 import { applyBranchScope } from '../branch-scope.plugin';
 
 @Schema({ _id: false })
 export class LoanItemSubdoc {
-  @Prop({ type: Types.ObjectId, ref: 'ProductDocument', required: true })
+  @Prop({ type: MongooseSchema.Types.ObjectId, ref: 'ProductDocument', required: true })
   product: Types.ObjectId;
 
-  @Prop({ type: Types.ObjectId, ref: 'CompanyDocument', required: true })
+  @Prop({ type: MongooseSchema.Types.ObjectId, ref: 'CompanyDocument', required: true })
   company: Types.ObjectId;
 
   @Prop({ required: true })
@@ -21,10 +21,10 @@ export const LoanItemSubdocSchema = SchemaFactory.createForClass(LoanItemSubdoc)
 
 @Schema({ _id: false })
 export class LoanReturnItemSubdoc {
-  @Prop({ type: Types.ObjectId, ref: 'ProductDocument', required: true })
+  @Prop({ type: MongooseSchema.Types.ObjectId, ref: 'ProductDocument', required: true })
   product: Types.ObjectId;
 
-  @Prop({ type: Types.ObjectId, ref: 'CompanyDocument', required: true })
+  @Prop({ type: MongooseSchema.Types.ObjectId, ref: 'CompanyDocument', required: true })
   company: Types.ObjectId;
 
   @Prop({ required: true })
@@ -41,7 +41,7 @@ export class LoanReturnSubdoc {
   @Prop()
   notes: string;
 
-  @Prop({ type: Types.ObjectId, ref: 'UserDocument' })
+  @Prop({ type: MongooseSchema.Types.ObjectId, ref: 'UserDocument' })
   returnedBy: Types.ObjectId;
 
   @Prop({ required: true, default: Date.now })
@@ -52,7 +52,7 @@ export const LoanReturnSubdocSchema = SchemaFactory.createForClass(LoanReturnSub
 
 @Schema({ timestamps: true, collection: 'loans' })
 export class LoanDocument {
-  @Prop({ type: Types.ObjectId, ref: 'BranchDocument', required: true })
+  @Prop({ type: MongooseSchema.Types.ObjectId, ref: 'BranchDocument', required: true })
   branch: Types.ObjectId;
 
   @Prop({ required: true })
@@ -73,7 +73,7 @@ export class LoanDocument {
   @Prop({ required: true, default: Date.now })
   date: Date;
 
-  @Prop({ type: Types.ObjectId, ref: 'UserDocument' })
+  @Prop({ type: MongooseSchema.Types.ObjectId, ref: 'UserDocument' })
   createdBy: Types.ObjectId;
 }
 

@@ -7,6 +7,7 @@ import { ICashRegisterRepository, CASH_REGISTER_REPOSITORY } from '../../../doma
 import { StockMovementType } from '../../../domain/enums';
 import { RecordStockMovementUseCase } from '../stock-movement/record-stock-movement.use-case';
 import { getNowInTimezone } from '../../../shared/utils/date.util';
+import { BILLING_DOCUMENT_REPOSITORY, IBillingDocumentRepository } from '../../../domain/repositories/billing-document.repository';
 
 @Injectable()
 export class DeleteCreditUseCase {
@@ -17,11 +18,15 @@ export class DeleteCreditUseCase {
     @Inject(PRODUCT_REPOSITORY) private readonly productRepository: IProductRepository,
     @Inject(CASH_REGISTER_REPOSITORY) private readonly cashRegisterRepository: ICashRegisterRepository,
     private readonly recordStockMovement: RecordStockMovementUseCase,
+    @Inject(BILLING_DOCUMENT_REPOSITORY) private readonly billingDocuments: IBillingDocumentRepository,
   ) {}
 
   async execute(id: string, userId?: string) {
     const credit = await this.creditRepository.findById(id);
     if (!credit) throw new BadRequestException('Crédito no encontrado');
+    for (const saleId of credit.saleIds || []) {
+      if (await this.billingDocuments.hasSubmittedSale(saleId)) throw new BadRequestException('Una venta de la cuenta tiene un comprobante fiscal enviado. Resuelve su situación antes de eliminar el crédito');
+    }
 
     // 1. Anular todas las ventas asociadas (devolver stock)
     for (const saleId of credit.saleIds || []) {

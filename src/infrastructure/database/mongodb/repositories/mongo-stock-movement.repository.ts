@@ -60,7 +60,7 @@ export class MongoStockMovementRepository implements IStockMovementRepository {
         .populate('user', 'fullName')
         .skip((page - 1) * limit)
         .limit(limit)
-        .sort({ date: -1, createdAt: -1 })
+        .sort({ date: -1, createdAt: -1, _id: -1 })
         .lean()
         .exec(),
       this.model.countDocuments(query).exec(),

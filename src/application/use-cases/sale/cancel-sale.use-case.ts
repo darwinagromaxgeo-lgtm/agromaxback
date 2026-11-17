@@ -8,6 +8,7 @@ import { ICreditAccountRepository, CREDIT_ACCOUNT_REPOSITORY } from '../../../do
 import { StockMovementType } from '../../../domain/enums';
 import { RecordStockMovementUseCase } from '../stock-movement/record-stock-movement.use-case';
 import { getNowInTimezone } from '../../../shared/utils/date.util';
+import { BILLING_DOCUMENT_REPOSITORY, IBillingDocumentRepository } from '../../../domain/repositories/billing-document.repository';
 
 @Injectable()
 export class CancelSaleUseCase {
@@ -19,12 +20,16 @@ export class CancelSaleUseCase {
     @Inject(CASH_REGISTER_REPOSITORY) private readonly cashRegisterRepository: ICashRegisterRepository,
     @Inject(CREDIT_ACCOUNT_REPOSITORY) private readonly creditAccountRepository: ICreditAccountRepository,
     private readonly recordStockMovement: RecordStockMovementUseCase,
+    @Inject(BILLING_DOCUMENT_REPOSITORY) private readonly billingDocuments: IBillingDocumentRepository,
   ) {}
 
   async execute(saleId: string, reason: string, userId?: string) {
     const sale = await this.saleRepository.findById(saleId);
     if (!sale) throw new BadRequestException('Venta no encontrada');
     if (sale.isCancelled) throw new BadRequestException('La venta ya fue anulada');
+    if (await this.billingDocuments.hasSubmittedSale(saleId)) {
+      throw new BadRequestException('La venta tiene un comprobante enviado, aceptado o pendiente de revisión. Debe resolverse su situación fiscal antes de anularla');
+    }
 
     // 1. Devolver stock por cada item
     for (const item of sale.items) {

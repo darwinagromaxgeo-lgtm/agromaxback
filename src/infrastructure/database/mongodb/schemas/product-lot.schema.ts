@@ -1,16 +1,16 @@
 import { Prop, Schema, SchemaFactory } from '@nestjs/mongoose';
-import { Document, Types } from 'mongoose';
+import { Document, Schema as MongooseSchema, Types } from 'mongoose';
 import { applyBranchScope } from '../branch-scope.plugin';
 
 @Schema({ timestamps: true, collection: 'product_lots' })
 export class ProductLotDocument {
-  @Prop({ type: Types.ObjectId, ref: 'ProductDocument', required: true })
+  @Prop({ type: MongooseSchema.Types.ObjectId, ref: 'ProductDocument', required: true })
   product: Types.ObjectId;
 
-  @Prop({ type: Types.ObjectId, ref: 'CompanyDocument', required: true })
+  @Prop({ type: MongooseSchema.Types.ObjectId, ref: 'CompanyDocument', required: true })
   company: Types.ObjectId;
 
-  @Prop({ type: Types.ObjectId, ref: 'BranchDocument', required: true })
+  @Prop({ type: MongooseSchema.Types.ObjectId, ref: 'BranchDocument', required: true })
   branch: Types.ObjectId;
 
   @Prop({ required: true })
@@ -25,7 +25,7 @@ export class ProductLotDocument {
   @Prop({ required: true, default: 0 })
   currentQuantity: number;
 
-  @Prop({ type: Types.ObjectId, ref: 'PurchaseDocument' })
+  @Prop({ type: MongooseSchema.Types.ObjectId, ref: 'PurchaseDocument' })
   purchaseId: Types.ObjectId;
 
   @Prop({ default: Date.now })

@@ -1,4 +1,4 @@
-import { Injectable, HttpException, HttpStatus } from '@nestjs/common';
+import { Injectable, HttpException, HttpStatus, BadRequestException, ServiceUnavailableException } from '@nestjs/common';
 import { HttpService } from '@nestjs/axios';
 import { ConfigService } from '@nestjs/config';
 import { firstValueFrom } from 'rxjs';
@@ -15,6 +15,7 @@ export class LookupService {
   }
 
   async searchByDni(numero: string) {
+    this.validateIdentity(numero, 8);
     try {
       const { data } = await firstValueFrom(
         this.httpService.get(`/reniec/dni`, {
@@ -36,6 +37,7 @@ export class LookupService {
   }
 
   async searchByRuc(numero: string) {
+    this.validateIdentity(numero, 11);
     try {
       const { data } = await firstValueFrom(
         this.httpService.get(`/sunat/ruc`, {
@@ -47,12 +49,18 @@ export class LookupService {
         razonSocial: data.razon_social,
         direccion: data.direccion,
         estado: data.estado,
+        condicion: data.condicion,
       };
     } catch (error) {
       const status = error.response?.status || HttpStatus.BAD_REQUEST;
       const message = error.response?.data?.message || 'RUC no encontrado';
       throw new HttpException(message, status);
     }
+  }
+
+  private validateIdentity(numero: string, length: number) {
+    if (!new RegExp(`^\\d{${length}}$`).test(numero)) throw new BadRequestException(`El documento debe tener ${length} dígitos`);
+    if (!this.apiKey) throw new ServiceUnavailableException('La consulta de identidad en Decolecta todavía no está configurada');
   }
 
   async getTipoCambio(date?: string) {

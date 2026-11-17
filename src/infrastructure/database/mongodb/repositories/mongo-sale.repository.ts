@@ -18,6 +18,7 @@ export class MongoSaleRepository implements ISaleRepository {
       client: sale.clientId || undefined,
       items: sale.items.map((i) => ({
         product: i.productId, company: i.companyId, quantity: i.quantity, priceTier: i.priceTier, unitPrice: i.unitPrice, subtotal: i.subtotal,
+        productName: i.productName, unit: i.unit, taxType: i.taxType, taxRate: i.taxRate,
       })),
       total: sale.total,
       voucherType: sale.voucherType || 'NONE',
@@ -70,8 +71,8 @@ export class MongoSaleRepository implements ISaleRepository {
           { $addFields: {
             baseSubtotal: {
               $cond: {
-                if: { $eq: [{ $ifNull: ['$productInfo.taxType', 'GRAVADO'] }, 'GRAVADO'] },
-                then: { $round: [{ $divide: ['$items.subtotal', 1.18] }, 2] },
+                if: { $eq: [{ $ifNull: ['$items.taxType', { $ifNull: ['$productInfo.taxType', 'GRAVADO'] }] }, 'GRAVADO'] },
+                then: { $round: [{ $divide: ['$items.subtotal', { $add: [1, { $ifNull: ['$items.taxRate', 0.18] }] }] }, 2] },
                 else: '$items.subtotal',
               },
             },
@@ -97,8 +98,8 @@ export class MongoSaleRepository implements ISaleRepository {
     return { data: data.map((d: any) => this.toEntity(d)), total, totalAmount, cancelledCount, totalBaseAmount, totalIgv };
   }
 
-  async findById(id: string): Promise<SaleEntity | null> {
-    const doc = await this.saleModel.findById(id).populate('company').populate('client').populate('items.product').populate('items.company').lean().exec();
+  async findById(id: string, branchId?: string): Promise<SaleEntity | null> {
+    const doc = await this.saleModel.findOne({ _id: id, ...(branchId ? { branch: branchId } : {}) }).populate('company').populate('client').populate('items.product').populate('items.company').lean().exec();
     return doc ? this.toEntity(doc) : null;
   }
 
@@ -133,7 +134,10 @@ export class MongoSaleRepository implements ISaleRepository {
       clientId: doc.client?._id?.toString() || doc.client?.toString(),
       items: (doc.items || []).map((i: any) => ({
         productId: i.product?._id?.toString() || i.product?.toString(),
-        productName: i.product?.name,
+        productName: i.productName || i.product?.name,
+        unit: i.unit,
+        taxType: i.taxType,
+        taxRate: i.taxRate,
         companyId: i.company?._id?.toString() || i.company?.toString(),
         quantity: i.quantity, priceTier: i.priceTier, unitPrice: i.unitPrice, subtotal: i.subtotal,
       })),

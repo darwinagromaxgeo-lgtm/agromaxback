@@ -7,6 +7,8 @@ export class UpdateBranchDto {
   @IsOptional() @IsString() phone?: string;
   @IsOptional() @IsArray() @ArrayMinSize(1) @IsMongoId({ each: true }) companyIds?: string[];
   @IsOptional() @IsMongoId() defaultCompanyId?: string;
+  @IsOptional() @IsString() @Matches(/^[1-9A-Z]$/) billingSeriesCode?: string;
+  @IsOptional() @IsString() @Matches(/^\d{4}$/) sunatEstablishmentCode?: string;
   @IsOptional() @IsBoolean() isActive?: boolean;
   @IsOptional() @IsBoolean() isMain?: boolean;
 }

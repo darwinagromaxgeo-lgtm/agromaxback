@@ -10,6 +10,30 @@ export interface ActiveIngredientItem {
   concentration?: string;
 }
 
+export interface ProductCatalogImport {
+  key: string;
+  branchId: string;
+  branchName: string;
+  sourceFile: string;
+  sourceDate: string;
+  presentation: string;
+  sources: string[];
+  pendingCategoryId: string;
+  taxProposal?: string;
+  taxConfiguration?: 'PROVISIONAL_GRAVADO' | 'SOURCE_EXCEL';
+  format?: 'SAUSAL_EXPORT';
+  sourceSku?: string;
+  baseSalePrice?: number;
+  offerSalePrice?: number;
+  offerActive?: boolean;
+  sourceStock?: number;
+  sourceGeneralStock?: number;
+  stockStatus?: 'IMPORTED' | 'IMPORTED_INACTIVE' | 'PENDING_NEGATIVE' | 'INACTIVE_SOURCE';
+  originalExportRow?: Record<string, string | number>;
+  reviewNotes: string[];
+  originalRows: { source: string; quantity: string; lot: string; expiration: string; state: string; notes: string }[];
+}
+
 export interface ProductEntity {
   id?: string;
   name: string;
@@ -19,6 +43,8 @@ export interface ProductEntity {
   activeIngredient?: string;
   activeIngredients?: ActiveIngredientItem[];
   taxType?: string;
+  catalogStatus?: 'READY' | 'PENDING_REVIEW';
+  catalogImport?: ProductCatalogImport;
   prices: ProductPrice[];
   tracksLot?: boolean;
   isActive: boolean;

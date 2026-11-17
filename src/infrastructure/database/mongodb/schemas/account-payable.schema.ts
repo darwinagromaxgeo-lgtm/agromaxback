@@ -1,5 +1,5 @@
 import { Prop, Schema, SchemaFactory } from '@nestjs/mongoose';
-import { Document, Types } from 'mongoose';
+import { Document, Schema as MongooseSchema, Types } from 'mongoose';
 
 @Schema({ _id: true, timestamps: false })
 export class APInstallmentSubdoc {
@@ -35,7 +35,7 @@ export class APPaymentSubdoc {
   @Prop()
   notes: string;
 
-  @Prop({ type: Types.ObjectId, ref: 'UserDocument' })
+  @Prop({ type: MongooseSchema.Types.ObjectId, ref: 'UserDocument' })
   registeredBy: Types.ObjectId;
 
   @Prop()
@@ -46,7 +46,7 @@ export const APPaymentSubdocSchema = SchemaFactory.createForClass(APPaymentSubdo
 
 @Schema({ timestamps: true, collection: 'accounts_payable' })
 export class AccountPayableDocument {
-  @Prop({ type: Types.ObjectId, ref: 'PurchaseDocument', required: true })
+  @Prop({ type: MongooseSchema.Types.ObjectId, ref: 'PurchaseDocument', required: true })
   purchase: Types.ObjectId;
 
   @Prop({ required: true })
@@ -85,7 +85,7 @@ export class AccountPayableDocument {
   @Prop()
   totalAmountPen: number;
 
-  @Prop({ type: Types.ObjectId, ref: 'UserDocument' })
+  @Prop({ type: MongooseSchema.Types.ObjectId, ref: 'UserDocument' })
   createdBy: Types.ObjectId;
 }
 

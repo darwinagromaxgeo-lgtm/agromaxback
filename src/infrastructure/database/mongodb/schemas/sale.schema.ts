@@ -1,13 +1,13 @@
 import { Prop, Schema, SchemaFactory } from '@nestjs/mongoose';
-import { Document, Types } from 'mongoose';
+import { Document, Schema as MongooseSchema, Types } from 'mongoose';
 import { applyBranchScope } from '../branch-scope.plugin';
 
 @Schema({ _id: false })
 export class SaleItemSubdoc {
-  @Prop({ type: Types.ObjectId, ref: 'ProductDocument', required: true })
+  @Prop({ type: MongooseSchema.Types.ObjectId, ref: 'ProductDocument', required: true })
   product: Types.ObjectId;
 
-  @Prop({ type: Types.ObjectId, ref: 'CompanyDocument', required: true })
+  @Prop({ type: MongooseSchema.Types.ObjectId, ref: 'CompanyDocument', required: true })
   company: Types.ObjectId;
 
   @Prop({ required: true })
@@ -21,13 +21,25 @@ export class SaleItemSubdoc {
 
   @Prop({ required: true })
   subtotal: number;
+
+  @Prop()
+  productName?: string;
+
+  @Prop()
+  unit?: string;
+
+  @Prop({ enum: ['GRAVADO', 'EXONERADO', 'INAFECTO'] })
+  taxType?: string;
+
+  @Prop({ min: 0, max: 1 })
+  taxRate?: number;
 }
 
 export const SaleItemSubdocSchema = SchemaFactory.createForClass(SaleItemSubdoc);
 
 @Schema({ _id: false })
 export class SalePaymentSubdoc {
-  @Prop({ type: Types.ObjectId, ref: 'PaymentMethodDocument' })
+  @Prop({ type: MongooseSchema.Types.ObjectId, ref: 'PaymentMethodDocument' })
   paymentMethod: Types.ObjectId;
 
   @Prop({ required: true })
@@ -41,13 +53,13 @@ export const SalePaymentSubdocSchema = SchemaFactory.createForClass(SalePaymentS
 
 @Schema({ timestamps: true, collection: 'sales' })
 export class SaleDocument {
-  @Prop({ type: Types.ObjectId, ref: 'BranchDocument', required: true })
+  @Prop({ type: MongooseSchema.Types.ObjectId, ref: 'BranchDocument', required: true })
   branch: Types.ObjectId;
 
-  @Prop({ type: Types.ObjectId, ref: 'CompanyDocument' })
+  @Prop({ type: MongooseSchema.Types.ObjectId, ref: 'CompanyDocument' })
   company: Types.ObjectId;
 
-  @Prop({ type: Types.ObjectId, ref: 'ClientDocument' })
+  @Prop({ type: MongooseSchema.Types.ObjectId, ref: 'ClientDocument' })
   client: Types.ObjectId;
 
   @Prop({ type: [SaleItemSubdocSchema], required: true })
@@ -72,7 +84,7 @@ export class SaleDocument {
   @Prop({ default: false })
   isCancelled: boolean;
 
-  @Prop({ type: Types.ObjectId, ref: 'UserDocument' })
+  @Prop({ type: MongooseSchema.Types.ObjectId, ref: 'UserDocument' })
   cancelledBy: Types.ObjectId;
 
   @Prop()
@@ -84,7 +96,7 @@ export class SaleDocument {
   @Prop({ required: true, default: Date.now })
   date: Date;
 
-  @Prop({ type: Types.ObjectId, ref: 'UserDocument' })
+  @Prop({ type: MongooseSchema.Types.ObjectId, ref: 'UserDocument' })
   createdBy: Types.ObjectId;
 }
 

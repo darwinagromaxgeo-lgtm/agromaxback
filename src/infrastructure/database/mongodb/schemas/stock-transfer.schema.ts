@@ -1,9 +1,9 @@
 import { Prop, Schema, SchemaFactory } from '@nestjs/mongoose';
-import { Document, Types } from 'mongoose';
+import { Document, Schema as MongooseSchema, Types } from 'mongoose';
 
 @Schema({ _id: false })
 export class StockTransferItemSubdoc {
-  @Prop({ type: Types.ObjectId, ref: 'ProductDocument', required: true })
+  @Prop({ type: MongooseSchema.Types.ObjectId, ref: 'ProductDocument', required: true })
   product: Types.ObjectId;
 
   @Prop({ required: true })
@@ -14,10 +14,10 @@ export const StockTransferItemSubdocSchema = SchemaFactory.createForClass(StockT
 
 @Schema({ timestamps: true, collection: 'stock-transfers' })
 export class StockTransferDocument {
-  @Prop({ type: Types.ObjectId, ref: 'CompanyDocument', required: true })
+  @Prop({ type: MongooseSchema.Types.ObjectId, ref: 'CompanyDocument', required: true })
   fromCompany: Types.ObjectId;
 
-  @Prop({ type: Types.ObjectId, ref: 'CompanyDocument', required: true })
+  @Prop({ type: MongooseSchema.Types.ObjectId, ref: 'CompanyDocument', required: true })
   toCompany: Types.ObjectId;
 
   @Prop({ type: [StockTransferItemSubdocSchema], required: true })
@@ -26,7 +26,7 @@ export class StockTransferDocument {
   @Prop()
   notes: string;
 
-  @Prop({ type: Types.ObjectId, ref: 'UserDocument', required: true })
+  @Prop({ type: MongooseSchema.Types.ObjectId, ref: 'UserDocument', required: true })
   transferredBy: Types.ObjectId;
 
   @Prop({ required: true, default: Date.now })
