@@ -50,7 +50,9 @@ export class MongoProductRepository implements IProductRepository {
     query.isActive = filter?.isActive !== undefined ? filter.isActive : true;
 
     const collation = { locale: 'es', strength: 1 };
-    const sortQuery = filter?.sort ? { name: filter.sort === 'asc' ? 1 : -1 } : { createdAt: -1 };
+    const sortQuery = filter?.sort
+      ? { name: filter.sort === 'asc' ? 1 : -1, _id: filter.sort === 'asc' ? 1 : -1 }
+      : { createdAt: -1, _id: -1 };
 
     const [data, total] = await Promise.all([
       this.productModel.find(query).collation(collation).skip((page - 1) * limit).limit(limit).sort(sortQuery as any).lean().exec(),
