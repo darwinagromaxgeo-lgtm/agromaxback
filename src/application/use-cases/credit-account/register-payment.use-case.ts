@@ -21,10 +21,13 @@ export class RegisterPaymentUseCase {
     const credit = await this.creditRepository.findById(creditId);
     if (!credit) throw new BadRequestException('Cuenta de crédito no encontrada');
     if (credit.status === 'PAID') throw new BadRequestException('El crédito ya está completamente pagado');
-    if (dto.amount > credit.pendingAmount) throw new BadRequestException(`El pago excede el monto pendiente. Máximo: ${credit.pendingAmount}`);
+    if (!Number.isFinite(dto.amount) || dto.amount <= 0 || Math.abs(dto.amount * 100 - Math.round(dto.amount * 100)) > 0.000001) {
+      throw new BadRequestException('El abono debe ser positivo y tener un máximo de dos decimales');
+    }
+    if (Math.round(dto.amount * 100) > Math.round(credit.pendingAmount * 100)) throw new BadRequestException(`El pago excede el monto pendiente. Máximo: ${credit.pendingAmount}`);
 
     const paymentMethod = await this.paymentMethodRepository.findById(dto.paymentMethodId);
-    if (!paymentMethod) throw new BadRequestException('Método de pago no encontrado');
+    if (!paymentMethod || paymentMethod.isActive === false) throw new BadRequestException('Método de pago no encontrado o inactivo');
 
     const register = await this.openCashRegister.execute({}, userId);
     const clientName = await this.clientRepository.findById(credit.clientId).then(c => c?.name || credit.clientId);
@@ -49,8 +52,8 @@ export class RegisterPaymentUseCase {
       receivedBy: userId,
     });
 
-    const newPaidAmount = credit.paidAmount + dto.amount;
-    const newPendingAmount = credit.totalAmount - newPaidAmount;
+    const newPaidAmount = (Math.round(credit.paidAmount * 100) + Math.round(dto.amount * 100)) / 100;
+    const newPendingAmount = (Math.round(credit.totalAmount * 100) - Math.round(newPaidAmount * 100)) / 100;
     const newStatus = newPendingAmount <= 0 ? 'PAID' : 'PARTIAL';
 
     return this.creditRepository.update(creditId, {

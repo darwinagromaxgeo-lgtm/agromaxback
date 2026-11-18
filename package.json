@@ -7,6 +7,7 @@
     "test:security": "npm run build && node --test --test-isolation=none tests/security-regression.test.cjs",
     "test:billing": "npm run build && node --test tests/billing-regression.test.cjs",
     "test:mvp": "npm run build && node --test tests/mvp-integration.test.cjs",
+    "test:checkout": "npm run build && node --test tests/credit-checkout.test.cjs",
     "dev": "nest start --watch",
     "start": "node dist/main",
     "start:prod": "node dist/main",

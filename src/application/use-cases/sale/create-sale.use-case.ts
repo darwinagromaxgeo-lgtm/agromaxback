@@ -14,6 +14,9 @@ import { AddSaleToCreditUseCase } from '../credit-account/add-sale-to-credit.use
 import { RecordStockMovementUseCase } from '../stock-movement/record-stock-movement.use-case';
 import { CLIENT_REPOSITORY, IClientRepository } from '../../../domain/repositories/client.repository';
 import { ProductEntity } from '../../../domain/entities/product.entity';
+import { InjectConnection } from '@nestjs/mongoose';
+import { Connection } from 'mongoose';
+import { RegisterPaymentUseCase } from '../credit-account/register-payment.use-case';
 import {
   CREDIT_ACCOUNT_REPOSITORY,
   ICreditAccountRepository,
@@ -35,18 +38,26 @@ export class CreateSaleUseCase {
     private readonly createCreditAccount: CreateCreditAccountUseCase,
     private readonly addSaleToCredit: AddSaleToCreditUseCase,
     private readonly recordStockMovement: RecordStockMovementUseCase,
+    private readonly registerCreditPayment: RegisterPaymentUseCase,
+    @InjectConnection() private readonly connection: Connection,
   ) {}
 
   async execute(dto: CreateSaleDto, userId?: string, branchId?: string) {
+    if (dto.isCredit && dto.payments?.length) {
+      // Propagate the transaction to the existing repositories and nested use
+      // cases: a failed deposit must not leave a sale, debt or stock deduction.
+      this.connection.base.set('transactionAsyncLocalStorage', true);
+      return this.connection.transaction(() => this.createSale(dto, userId, branchId));
+    }
+    return this.createSale(dto, userId, branchId);
+  }
+
+  private async createSale(dto: CreateSaleDto, userId?: string, branchId?: string) {
     if (!branchId) throw new BadRequestException('Selecciona una sucursal para registrar la venta');
     const isCredit = dto.isCredit || false;
 
     if (isCredit && !dto.clientId) {
       throw new BadRequestException('El cliente es requerido para ventas a crédito');
-    }
-
-    if (isCredit && dto.payments && dto.payments.length > 0) {
-      throw new BadRequestException('Las ventas a crédito no deben tener pagos');
     }
 
     if (!isCredit && (!dto.payments || dto.payments.length === 0)) {
@@ -55,14 +66,14 @@ export class CreateSaleUseCase {
 
     if (dto.clientId) {
       const client = await this.clientRepository.findById(dto.clientId);
-      if (!client || client.branchId !== branchId) {
+      if (!client || client.branchId !== branchId || !client.isActive) {
         throw new BadRequestException('El cliente no pertenece a la sucursal activa');
       }
     }
 
     if (dto.creditAccountId) {
       const credit = await this.creditRepository.findById(dto.creditAccountId);
-      if (!credit) {
+      if (!isCredit || !credit || credit.branchId !== branchId) {
         throw new BadRequestException('Cuenta de crédito no encontrada en la sucursal activa');
       }
       if (credit.status === 'PAID') {
@@ -115,18 +126,26 @@ export class CreateSaleUseCase {
     const roundedTotal = Math.round(total * 100) / 100;
     const saleDate = dto.date ? new Date(dto.date) : getNowInTimezone();
 
-    // Validate payment amounts sum equals total
+    // On credit sales, payments are the amounts received now, not the debt.
     let paymentsData: { paymentMethodId: string; paymentMethodName: string; amount: number }[] = [];
-    if (!isCredit && dto.payments) {
-      const paymentSum = Math.round(dto.payments.reduce((sum, p) => sum + p.amount, 0) * 100) / 100;
-      if (paymentSum !== roundedTotal) {
+    if (dto.payments?.length) {
+      for (const payment of dto.payments) {
+        if (!Number.isFinite(payment.amount) || payment.amount <= 0 || Math.abs(payment.amount * 100 - Math.round(payment.amount * 100)) > 0.000001) {
+          throw new BadRequestException('Cada pago debe tener un monto positivo con un máximo de dos decimales');
+        }
+      }
+      const paymentSum = dto.payments.reduce((sum, p) => sum + Math.round(p.amount * 100), 0) / 100;
+      if (isCredit && paymentSum >= roundedTotal) {
+        throw new BadRequestException('El abono inicial debe ser menor al total. Para cobrar todo, utiliza pago inmediato');
+      }
+      if (!isCredit && paymentSum !== roundedTotal) {
         throw new BadRequestException(`La suma de los pagos (${paymentSum}) no coincide con el total de la venta (${roundedTotal})`);
       }
 
       // Resolve payment method names
       for (const payment of dto.payments) {
         const method = await this.paymentMethodRepository.findById(payment.paymentMethodId);
-        if (!method) {
+        if (!method || method.isActive === false) {
           throw new BadRequestException(`Método de pago no encontrado: ${payment.paymentMethodId}`);
         }
         paymentsData.push({
@@ -210,10 +229,12 @@ export class CreateSaleUseCase {
     }
 
     if (isCredit) {
+      let creditId: string;
       if (dto.creditAccountId) {
         await this.addSaleToCredit.execute(dto.creditAccountId, sale.id!, roundedTotal);
+        creditId = dto.creditAccountId;
       } else {
-        await this.createCreditAccount.execute(
+        const credit = await this.createCreditAccount.execute(
           dto.clientId!,
           sale.id!,
           roundedTotal,
@@ -221,6 +242,14 @@ export class CreateSaleUseCase {
           dto.creditName,
           branchId,
         );
+        creditId = credit.id!;
+      }
+      for (const payment of paymentsData) {
+        await this.registerCreditPayment.execute(creditId, {
+          paymentMethodId: payment.paymentMethodId,
+          amount: payment.amount,
+          notes: `Abono inicial de venta ${sale.id}`,
+        }, userId);
       }
     }
 
