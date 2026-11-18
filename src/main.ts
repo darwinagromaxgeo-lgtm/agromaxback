@@ -78,7 +78,11 @@ async function bootstrap() {
   SwaggerModule.setup('api/docs', app, document);
 
   const expressApp = app.getHttpAdapter().getInstance();
-  expressApp.get('/api/health', (_req: any, res: any) => res.json({ status: 'ok', timestamp: new Date().toISOString() }));
+  const revision = process.env.RENDER_GIT_COMMIT;
+  expressApp.get('/api/health', (_req: any, res: any) => res.json({
+    status: 'ok', timestamp: new Date().toISOString(),
+    ...(revision && /^[a-f\d]{40}$/i.test(revision) ? { revision } : {}),
+  }));
 
   const port = configService.get<number>('app.port') || 3000;
   await app.listen(port, process.env.HOST || '0.0.0.0');
