@@ -8,10 +8,12 @@ import { SaleModule } from './sale.module';
 import { CompanyModule } from './company.module';
 import { ClientModule } from './client.module';
 import { ProductModule } from './product.module';
+import { BillingCreditNoteService } from '../application/services/billing-credit-note.service';
+import { BillingCreditNoteController } from '../presentation/controllers/billing-credit-note.controller';
 
 @Module({
   imports: [BillingPersistenceModule, SaleModule, CompanyModule, ClientModule, ProductModule],
-  providers: [BillingService, { provide: BILLING_PROVIDER, useClass: GreenterBillingProvider }],
-  controllers: [BillingController],
+  providers: [BillingService, BillingCreditNoteService, { provide: BILLING_PROVIDER, useClass: GreenterBillingProvider }],
+  controllers: [BillingController, BillingCreditNoteController],
 })
 export class BillingModule {}

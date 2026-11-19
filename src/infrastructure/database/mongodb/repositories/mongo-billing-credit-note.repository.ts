@@ -1,0 +1,82 @@
+import { ConflictException, Injectable, OnModuleInit } from '@nestjs/common';
+import { InjectModel } from '@nestjs/mongoose';
+import { Model, Types } from 'mongoose';
+import { BillingCreditNoteEntity } from '../../../../domain/entities/billing-credit-note.entity';
+import { BillingDocumentEntity, BillingSubmissionResult } from '../../../../domain/entities/billing-document.entity';
+import { IBillingCreditNoteRepository } from '../../../../domain/repositories/billing-credit-note.repository';
+import { BillingCreditNote } from '../schemas/billing-credit-note.schema';
+import { BillingDocument } from '../schemas/billing-document.schema';
+
+@Injectable()
+export class MongoBillingCreditNoteRepository implements IBillingCreditNoteRepository, OnModuleInit {
+  constructor(@InjectModel(BillingCreditNote.name) private readonly model:Model<any>, @InjectModel(BillingDocument.name) private readonly originals:Model<any>) {}
+  async onModuleInit() { await this.model.init(); }
+
+  private entity(document:any): BillingCreditNoteEntity {
+    const { _id, branch, company, sale, originalDocument, __v, activeSlot, holdsReservation, requestId, requestHash, creditNoteRevision, pdfBase64, xmlBase64, cdrBase64, ...data } = document;
+    return { ...data, id:_id.toString(), branchId:branch.toString(), companyId:company.toString(), saleId:sale.toString(), originalDocumentId:originalDocument?.toString(), createdBy:data.createdBy?.toString(), submittedBy:data.submittedBy?.toString(), discardedBy:data.discardedBy?.toString() };
+  }
+  async findAll(branchId:string, filter:{ originalDocumentId?:string; companyId?:string; status?:string; page:number; limit:number }) {
+    const query:any = { branch:branchId, ...(filter.originalDocumentId ? { originalDocument:filter.originalDocumentId } : {}), ...(filter.companyId ? { company:filter.companyId } : {}), ...(filter.status ? { status:filter.status } : {}) };
+    const [documents,total] = await Promise.all([this.model.find(query).sort({ createdAt:-1, _id:-1 }).skip((filter.page-1)*filter.limit).limit(filter.limit).lean().exec(), this.model.countDocuments(query).exec()]);
+    return { data:documents.map(document=>this.entity(document)), total };
+  }
+  async findById(id:string, branchId:string) { const doc=await this.model.findOne({ _id:id, branch:branchId }).lean().exec(); return doc ? this.entity(doc) : null; }
+  async forOriginal(id:string, branchId:string) { return (await this.model.find({ originalDocument:id, branch:branchId }).sort({ createdAt:1 }).lean().exec()).map(doc=>this.entity(doc)); }
+
+  async createDraft(originalId:string, branchId:string, requestId:string, requestHash:string, build:(original:BillingDocumentEntity, previous:BillingCreditNoteEntity[])=>BillingCreditNoteEntity) {
+    const session=await this.model.db.startSession();
+    let result:BillingCreditNoteEntity;
+    try {
+      await session.withTransaction(async()=>{
+        const existing:any=await this.model.findOne({ branch:branchId, requestId }).session(session).lean().exec();
+        if (existing) {
+          if (existing.requestHash !== requestHash) throw new ConflictException('Esta solicitud ya se utilizó con otros datos');
+          result=this.entity(existing); return;
+        }
+        // Serialize reservations on the original document. Concurrent partial returns cannot overspend it.
+        const original:any=await this.originals.findOneAndUpdate({ _id:originalId, branch:branchId, status:'ACCEPTED' }, { $inc:{ creditNoteRevision:1 } }, { new:true, session }).lean().exec();
+        if (!original) throw new ConflictException('El comprobante original no está aceptado en esta sucursal');
+        const previous:any[]=await this.model.find({ originalDocument:originalId, branch:branchId }).session(session).lean().exec();
+        if (previous.some(note=>note.holdsReservation)) throw new ConflictException('Ya existe una nota de crédito en borrador o pendiente de resolver para este comprobante. Ábrela desde Notas de crédito');
+        const originalEntity={ ...this.entity(original), documentType:original.documentType } as BillingDocumentEntity;
+        const note=build(originalEntity, previous.map(doc=>this.entity(doc)));
+        const { id, branchId:noteBranch, companyId, saleId, originalDocumentId, ...data }=note;
+        const saved=await this.model.create([{ ...data, branch:noteBranch, company:companyId, sale:saleId, originalDocument:originalDocumentId, requestId, requestHash, holdsReservation:true }], { session });
+        result=this.entity(saved[0].toObject());
+      }, { readConcern:{ level:'snapshot' }, writeConcern:{ w:'majority' } });
+      return result!;
+    } catch (error:any) {
+      if (error?.code === 11000) throw new ConflictException('Otra solicitud ya creó una nota de crédito. Actualiza el listado');
+      throw error;
+    } finally { await session.endSession(); }
+  }
+  async claimDraft(id:string, branchId:string, userId:string) {
+    const doc=await this.model.findOneAndUpdate({ _id:id, branch:branchId, status:'DRAFT' }, { $set:{ status:'SENDING', submittedBy:userId, submittedAt:new Date() } }, { new:true, runValidators:true }).lean().exec();
+    return doc ? this.entity(doc) : null;
+  }
+  async discard(id:string, branchId:string, reason:string, userId:string) {
+    const doc=await this.model.findOneAndUpdate({ _id:id, branch:branchId, status:'DRAFT' }, { $set:{ status:'DISCARDED', holdsReservation:false, discardReason:reason, discardedBy:userId, discardedAt:new Date() } }, { new:true, runValidators:true }).lean().exec();
+    return doc ? this.entity(doc) : null;
+  }
+  async setSubmission(id:string, branchId:string, data:Partial<BillingCreditNoteEntity>) {
+    const changed=await this.model.updateOne({ _id:id, branch:branchId, status:'SENDING' }, { $set:data }).exec();
+    if (changed.matchedCount !== 1) throw new ConflictException('La nota de crédito cambió durante el envío');
+  }
+  async saveResult(id:string, branchId:string, result:BillingSubmissionResult) {
+    const doc=await this.model.findOneAndUpdate({ _id:id, branch:branchId, status:{ $in:['SENDING','PENDING','UNKNOWN'] } }, { $set:{ ...result, holdsReservation:!['ACCEPTED','REJECTED'].includes(result.status), ...(result.pdfBase64 ? { hasPdf:true } : {}), ...(result.xmlBase64 ? { hasXml:true } : {}), ...(result.cdrBase64 ? { hasCdr:true } : {}) } }, { new:true, runValidators:true }).lean().exec();
+    if (!doc) {
+      const current=await this.findById(id,branchId);
+      if (current && ['ACCEPTED','REJECTED'].includes(current.status)) return current;
+      throw new ConflictException('No se pudo guardar la respuesta de la nota de crédito');
+    }
+    return this.entity(doc);
+  }
+  async artifact(id:string, branchId:string, format:'pdf'|'xml'|'cdr') {
+    const field=`${format}Base64`;
+    const doc:any=await this.model.findOne({ _id:id, branch:branchId }).select(`+${field}`).lean().exec();
+    if (!doc?.[field]) return null;
+    const reference=format==='cdr' && doc.summaryDate ? `${doc.issuer.documentNumber}-RC-${doc.summaryDate.replace(/-/g,'')}-${doc.summaryNumber}` : `${doc.issuer.documentNumber}-07-${doc.series}-${String(doc.number).padStart(8,'0')}`;
+    return { data:doc[field] as string, filename:`${format==='cdr'?'R-':''}${reference}.${format==='cdr'?'zip':format}` };
+  }
+}

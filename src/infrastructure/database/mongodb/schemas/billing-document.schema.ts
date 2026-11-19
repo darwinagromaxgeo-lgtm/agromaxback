@@ -5,6 +5,9 @@ import { BillingItemSnapshot, BillingPartySnapshot } from '../../../../domain/en
 
 @Schema({ timestamps: true, collection: 'billing_documents' })
 export class BillingDocument {
+  @Prop({ type:Number, default:0, min:0 })
+  creditNoteRevision: number;
+
   @Prop({ type: MongoSchema.Types.ObjectId, ref: 'BranchDocument', required: true })
   branch: Types.ObjectId;
 

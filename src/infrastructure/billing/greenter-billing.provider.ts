@@ -4,6 +4,7 @@ import axios from 'axios';
 import { BillingDocumentEntity, BillingDocumentType, BillingProviderStatus, BillingServiceSimulation, BillingSubmissionResult } from '../../domain/entities/billing-document.entity';
 import { IBillingProvider } from '../../domain/repositories/billing-provider';
 import { sunatUnit } from '../../application/services/billing-calculation';
+import { BillingCreditNoteEntity } from '../../domain/entities/billing-credit-note.entity';
 
 @Injectable()
 export class GreenterBillingProvider implements IBillingProvider {
@@ -33,6 +34,19 @@ export class GreenterBillingProvider implements IBillingProvider {
   getSummaryNumberLimit(): number {
     return this.config.get('GREENTER_EXTERNAL_BILLING_ACTIVE') === 'true'
       ? Number(this.config.get('GREENTER_SUMMARY_LAST_NUMBER')) : 99_999;
+  }
+
+  getCreditNoteNumberingStart(type:'FACTURA'|'BOLETA'): number {
+    return Number(this.config.get(type==='FACTURA' ? 'GREENTER_NOTA_CREDITO_FACTURA_NEXT_NUMBER' : 'GREENTER_NOTA_CREDITO_BOLETA_NEXT_NUMBER') || 1);
+  }
+
+  private creditNoteStatus(branchCode:string|undefined, supported:boolean, summaryReady:boolean, mode:string) {
+    const code=branchCode && /^[1-9A-Z]$/.test(branchCode) ? branchCode : '';
+    const branchNumbering=this.config.get('GREENTER_BRANCH_NUMBERING')==='true';
+    const series=branchNumbering ? { FACTURA:code ? `FNC${code}` : '', BOLETA:code ? `BNC${code}` : '' } : { FACTURA:String(this.config.get('GREENTER_SERIE_NOTA_CREDITO_FACTURA') || ''), BOLETA:String(this.config.get('GREENTER_SERIE_NOTA_CREDITO_BOLETA') || '') };
+    const numbers=['FACTURA','BOLETA'].every(type=>{const number=this.getCreditNoteNumberingStart(type as BillingDocumentType);return Number.isSafeInteger(number)&&number>=1&&number<=99_999_999;});
+    const ready=this.config.get('GREENTER_CREDIT_NOTES_ENABLED')!=='false' && supported && numbers && /^F[A-Z0-9]{3}$/.test(series.FACTURA) && /^B[A-Z0-9]{3}$/.test(series.BOLETA) && (mode==='individual'||summaryReady);
+    return { ready, series, message:ready ? 'Notas de crédito disponibles para devoluciones totales o parciales.' : 'Las notas de crédito requieren el facturador actualizado y sus series configuradas.' };
   }
 
   private options(timeout = 10_000) {
@@ -95,7 +109,7 @@ export class GreenterBillingProvider implements IBillingProvider {
         && Number.isSafeInteger(summaryLimit) && summaryLimit >= summaryNumber && summaryLimit <= 99_999;
       const boletaSubmissionMode = data.boletaSubmissionMode === 'individual' ? 'individual' : 'summary';
       const supportedDocumentTypes = (['FACTURA', 'BOLETA'] as const).filter(type => data.supportedDocumentTypes?.includes(type) && (type !== 'BOLETA' || boletaSubmissionMode === 'individual' || summaryReady));
-      return { ...base, ready: supportedDocumentTypes.length > 0, issuerName: data.issuer.razonSocial, issuerAddress: data.issuer.direccion, issuerEstablishmentCode, boletaSubmissionMode, supportedDocumentTypes, message: boletaSubmissionMode === 'summary' && !summaryReady
+      return { ...base, ready: supportedDocumentTypes.length > 0, creditNotes:this.creditNoteStatus(branchSeriesCode, data.supportedDocumentTypes?.includes('NOTA_CREDITO')===true, summaryReady, boletaSubmissionMode), issuerName: data.issuer.razonSocial, issuerAddress: data.issuer.direccion, issuerEstablishmentCode, boletaSubmissionMode, supportedDocumentTypes, message: boletaSubmissionMode === 'summary' && !summaryReady
         ? 'Facturas preparadas. Para habilitar boletas falta coordinar la numeración del resumen diario del RUC. Si otro software también emite, reserva un rango exclusivo para Agromax en ambos sistemas.'
         : config.environment === 'production' ? 'Configuración local lista para producción. La aceptación se confirma con la respuesta de SUNAT al emitir.' : 'Conexión verificada en pruebas.' };
     } catch {
@@ -163,7 +177,31 @@ export class GreenterBillingProvider implements IBillingProvider {
     } catch { return { status: 'PENDING', ticket: document.ticket, sunatDescription: 'No se pudo consultar el ticket. Puedes consultar de nuevo sin reenviar el comprobante.' }; }
   }
 
-  private parseResult(data: any, document: BillingDocumentEntity): BillingSubmissionResult {
+  buildCreditNotePayload(document:BillingCreditNoteEntity) {
+    return { ...this.buildPayload({ ...document, documentType:document.originalDocumentType }), tipoDoc:'07',
+      tipDocAfectado:document.originalDocumentType==='FACTURA' ? '01' : '03',
+      numDocAfectado:`${document.originalSeries}-${String(document.originalNumber).padStart(8,'0')}`,
+      codMotivo:document.reasonCode, desMotivo:document.reasonDescription,
+    };
+  }
+
+  async submitCreditNote(document:BillingCreditNoteEntity): Promise<BillingSubmissionResult> {
+    try {
+      const response=await axios.post(`${this.settings().url}/api/agromax/credit-notes/generate`,this.buildCreditNotePayload(document),this.options(90_000));
+      return this.parseResult(response.data,document);
+    } catch { return { status:'UNKNOWN',sunatDescription:'No se confirmó la respuesta de la nota de crédito. Consulta su estado antes de continuar.' }; }
+  }
+
+  async checkCreditNoteStatus(document:BillingCreditNoteEntity): Promise<BillingSubmissionResult> {
+    try {
+      const response=await axios.post(`${this.settings().url}/api/agromax/credit-notes/status`, { emisorRuc:document.issuer.documentNumber, environment:document.environment, tipoDoc:'07', tipDocAfectado:document.originalDocumentType==='FACTURA'?'01':'03', serie:document.series, numero:String(document.number).padStart(8,'0') },this.options(30_000));
+      const result=this.parseResult(response.data,document);
+      if (result.status==='UNKNOWN' && document.status==='PENDING') return { ...result,status:'PENDING',ticket:document.ticket };
+      return result;
+    } catch { return { status:document.status==='PENDING'?'PENDING':'UNKNOWN',ticket:document.ticket,sunatDescription:'Consulta no disponible. Puedes comprobar de nuevo sin reenviar la nota.' }; }
+  }
+
+  private parseResult(data: any, document: Pick<BillingDocumentEntity,'series'|'number'|'issuer'|'environment'>): BillingSubmissionResult {
     const unknown: BillingSubmissionResult = { status: 'UNKNOWN', sunatDescription: 'La respuesta no permite confirmar el resultado. Revisa el comprobante antes de continuar.' };
     if (!data || data.invoiceNumber !== `${document.series}-${String(document.number).padStart(8, '0')}` || data.emisorRuc !== document.issuer.documentNumber || data.environment !== document.environment) return unknown;
     const code = data.sunatResponse?.code == null ? undefined : String(data.sunatResponse.code);

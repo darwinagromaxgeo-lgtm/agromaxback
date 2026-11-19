@@ -93,6 +93,7 @@ export interface BillingProviderStatus {
   boletaSubmissionMode?: 'individual' | 'summary';
   series?: { FACTURA: string; BOLETA: string };
   supportedDocumentTypes: BillingDocumentType[];
+  creditNotes?: { ready:boolean; series:{ FACTURA:string; BOLETA:string }; message:string };
   message: string;
 }
 
