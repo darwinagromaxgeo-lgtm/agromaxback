@@ -40,13 +40,13 @@ export class GreenterBillingProvider implements IBillingProvider {
     return Number(this.config.get(type==='FACTURA' ? 'GREENTER_NOTA_CREDITO_FACTURA_NEXT_NUMBER' : 'GREENTER_NOTA_CREDITO_BOLETA_NEXT_NUMBER') || 1);
   }
 
-  private creditNoteStatus(branchCode:string|undefined, supported:boolean, summaryReady:boolean, mode:string) {
+  private creditNoteStatus(branchCode:string|undefined, supported:boolean, summaryReady:boolean, mode:string, cancellationSupported=false) {
     const code=branchCode && /^[1-9A-Z]$/.test(branchCode) ? branchCode : '';
     const branchNumbering=this.config.get('GREENTER_BRANCH_NUMBERING')==='true';
     const series=branchNumbering ? { FACTURA:code ? `FNC${code}` : '', BOLETA:code ? `BNC${code}` : '' } : { FACTURA:String(this.config.get('GREENTER_SERIE_NOTA_CREDITO_FACTURA') || ''), BOLETA:String(this.config.get('GREENTER_SERIE_NOTA_CREDITO_BOLETA') || '') };
     const numbers=['FACTURA','BOLETA'].every(type=>{const number=this.getCreditNoteNumberingStart(type as BillingDocumentType);return Number.isSafeInteger(number)&&number>=1&&number<=99_999_999;});
     const ready=this.config.get('GREENTER_CREDIT_NOTES_ENABLED')!=='false' && supported && numbers && /^F[A-Z0-9]{3}$/.test(series.FACTURA) && /^B[A-Z0-9]{3}$/.test(series.BOLETA) && (mode==='individual'||summaryReady);
-    return { ready, series, message:ready ? 'Notas de crédito disponibles para devoluciones totales o parciales.' : 'Las notas de crédito requieren el facturador actualizado y sus series configuradas.' };
+    return { ready, cancellationReady:ready&&cancellationSupported, series, message:ready ? 'Notas de crédito disponibles. La nueva emisión requiere una anulación aceptada.' : 'Las notas de crédito requieren el facturador actualizado y sus series configuradas.' };
   }
 
   private options(timeout = 10_000) {
@@ -109,7 +109,7 @@ export class GreenterBillingProvider implements IBillingProvider {
         && Number.isSafeInteger(summaryLimit) && summaryLimit >= summaryNumber && summaryLimit <= 99_999;
       const boletaSubmissionMode = data.boletaSubmissionMode === 'individual' ? 'individual' : 'summary';
       const supportedDocumentTypes = (['FACTURA', 'BOLETA'] as const).filter(type => data.supportedDocumentTypes?.includes(type) && (type !== 'BOLETA' || boletaSubmissionMode === 'individual' || summaryReady));
-      return { ...base, ready: supportedDocumentTypes.length > 0, creditNotes:this.creditNoteStatus(branchSeriesCode, data.supportedDocumentTypes?.includes('NOTA_CREDITO')===true, summaryReady, boletaSubmissionMode), issuerName: data.issuer.razonSocial, issuerAddress: data.issuer.direccion, issuerEstablishmentCode, boletaSubmissionMode, supportedDocumentTypes, message: boletaSubmissionMode === 'summary' && !summaryReady
+      return { ...base, ready: supportedDocumentTypes.length > 0, creditNotes:this.creditNoteStatus(branchSeriesCode, data.supportedDocumentTypes?.includes('NOTA_CREDITO')===true, summaryReady, boletaSubmissionMode, data.creditNoteReasons?.includes('01')===true), issuerName: data.issuer.razonSocial, issuerAddress: data.issuer.direccion, issuerEstablishmentCode, boletaSubmissionMode, supportedDocumentTypes, message: boletaSubmissionMode === 'summary' && !summaryReady
         ? 'Facturas preparadas. Para habilitar boletas falta coordinar la numeración del resumen diario del RUC. Si otro software también emite, reserva un rango exclusivo para Agromax en ambos sistemas.'
         : config.environment === 'production' ? 'Configuración local lista para producción. La aceptación se confirma con la respuesta de SUNAT al emitir.' : 'Conexión verificada en pruebas.' };
     } catch {

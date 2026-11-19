@@ -65,6 +65,7 @@ function fixture() {
   const counters = new Map();
   const calls = { create: 0, submit: 0, poll: 0, reserve: 0 };
   const documents = {
+    findCancelledForSale: async (saleId,companyId,taxType,branchId) => clone([...records.values()].find(doc=>doc.saleId===saleId&&doc.companyId===companyId&&doc.taxType===taxType&&doc.branchId===branchId&&doc.cancelledByCreditNoteId) || null),
     findAll: async (filter, page, limit) => { const values = [...records.values()].filter(doc => doc.branchId === filter.branchId); return { data: clone(values.slice((page - 1) * limit, page * limit)), total: values.length }; },
     findById: async (id, branchId) => { const doc = records.get(id); return doc?.branchId === branchId ? clone(doc) : null; },
     findForSale: async (saleId, companyId, taxType, branchId) => clone([...records.values()].find(doc => doc.saleId === saleId && doc.companyId === companyId && doc.taxType === taxType && doc.branchId === branchId && doc.status !== 'DISCARDED') || null),

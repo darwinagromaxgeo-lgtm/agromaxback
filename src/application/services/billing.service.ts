@@ -81,6 +81,7 @@ export class BillingService {
   }
 
   async preview(dto: CreateBillingDraftDto, branch: BranchEntity): Promise<BillingDocumentEntity> {
+    if (dto.replacesDocumentId) return this.previewReissue(dto,branch);
     const branchId = branch.id!;
     if (!branch.companyIds.includes(dto.companyId)) throw new BadRequestException('La empresa no está habilitada en esta sucursal');
     const sale = await this.sales.findById(dto.saleId, branchId);
@@ -146,17 +147,43 @@ export class BillingService {
     };
   }
 
+  private async previewReissue(dto:CreateBillingDraftDto,branch:BranchEntity):Promise<BillingDocumentEntity> {
+    const original=await this.findById(dto.replacesDocumentId!,branch.id!);
+    if (!original.cancelledByCreditNoteId || !original.cancelledAt || original.status!=='ACCEPTED') throw new BadRequestException('Primero debe aceptarse la nota de crédito que anula este comprobante');
+    if (original.saleId!==dto.saleId || original.companyId!==dto.companyId || original.taxType!==dto.taxType || !branch.companyIds.includes(original.companyId)) throw new BadRequestException('La nueva emisión debe corresponder al mismo pedido, empresa y afectación tributaria');
+    if (original.replacementDocumentId) {
+      const replacement=await this.findById(original.replacementDocumentId,branch.id!);
+      if (replacement.status!=='DISCARDED') throw new ConflictException('Este comprobante ya fue reemplazado. Abre el nuevo comprobante para continuar');
+    }
+    const [sale,company]=await Promise.all([this.sales.findById(original.saleId,branch.id!),this.companies.findById(original.companyId)]);
+    if (!sale || sale.branchId!==branch.id || sale.isCancelled || !company?.isActive || company.ruc.trim()!==original.issuer.documentNumber) throw new BadRequestException('El pedido o la empresa emisora no están disponibles para una nueva emisión');
+    const receiver=normalizeBillingReceiver(dto.documentType,original.total,dto.receiver || original.receiver);
+    return {
+      branchId:original.branchId,companyId:original.companyId,saleId:original.saleId,documentType:dto.documentType,
+      taxType:original.taxType,status:'DRAFT',currency:original.currency,issuer:{...original.issuer},receiver,
+      items:original.items.map(item=>({...item})),taxableAmount:original.taxableAmount,exemptAmount:original.exemptAmount,unaffectedAmount:original.unaffectedAmount,taxAmount:original.taxAmount,total:original.total,
+      paymentCondition:original.paymentCondition,saleDate:original.saleDate,warnings:[],legacyTaxData:false,environment:original.environment,
+      replacesDocumentId:original.id,reissueAfterCreditNoteId:original.cancelledByCreditNoteId,
+    };
+  }
+
   async createDraft(dto: CreateBillingDraftDto, branch: BranchEntity, userId: string) {
     const existing = await this.documents.findForSale(dto.saleId, dto.companyId, dto.taxType, branch.id!);
-    if (existing) return this.existingDraft(existing, dto.documentType, dto.receiver);
+    if (existing) {
+      if (dto.replacesDocumentId && existing.replacesDocumentId!==dto.replacesDocumentId) throw new ConflictException('El pedido ya tiene otro comprobante vigente. Ábrelo para continuar');
+      return this.existingDraft(existing, dto.documentType, dto.receiver);
+    }
+    if (!dto.replacesDocumentId && await this.documents.findCancelledForSale(dto.saleId,dto.companyId,dto.taxType,branch.id!)) throw new ConflictException('El comprobante anterior está anulado. Usa Volver a emitir desde ese comprobante para conservar su historial');
     const document = await this.preview(dto, branch);
     if (document.legacyTaxData && dto.legacyTaxConfirmed !== true) throw new BadRequestException('Confirma la revisión de datos tributarios de esta venta anterior');
     try {
-      return await this.documents.createDraft({ ...document, createdBy: userId });
+      const saved=await this.documents.createDraft({ ...document, createdBy: userId });
+      return dto.replacesDocumentId ? this.existingDraft(saved,dto.documentType,dto.receiver) : saved;
     } catch (error: any) {
       if (error?.code !== 11000) throw error;
       const winner = await this.documents.findForSale(dto.saleId, dto.companyId, dto.taxType, branch.id!);
       if (!winner) throw new ConflictException('Otra solicitud está preparando este comprobante. Actualiza el listado');
+      if (dto.replacesDocumentId && winner.replacesDocumentId!==dto.replacesDocumentId) throw new ConflictException('El pedido ya tiene otro comprobante vigente. Actualiza su historial');
       return this.existingDraft(winner, dto.documentType, dto.receiver);
     }
   }
@@ -222,6 +249,7 @@ export class BillingService {
     }
     const status = await this.provider.getStatus(branch.billingSeriesCode, branch.sunatEstablishmentCode);
     if (!status.ready || !status.series || !status.environment || status.environment === 'simulation') throw new BadRequestException(status.message);
+    if (document.reissueAfterCreditNoteId && document.environment!==status.environment) throw new BadRequestException('El ambiente de la nueva emisión debe coincidir con el comprobante anulado');
     if (status.issuerRuc !== document.issuer.documentNumber) throw new BadRequestException('El RUC del servicio no coincide con la empresa del comprobante');
     if (!status.supportedDocumentTypes.includes(document.documentType)) throw new BadRequestException('El servicio todavía no habilita este tipo de comprobante');
     const claimed = await this.documents.claimDraft(id, branch.id!, userId, document.receiverRevision ?? 0);

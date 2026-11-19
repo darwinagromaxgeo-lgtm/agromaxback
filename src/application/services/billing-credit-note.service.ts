@@ -62,6 +62,7 @@ export class BillingCreditNoteService {
     for (const item of note.items) sunatUnit(item.unit);
     const status=await this.provider.getStatus(branch.billingSeriesCode,branch.sunatEstablishmentCode);
     if (!status.ready || !status.creditNotes?.ready || !status.environment || status.environment==='simulation') throw new BadRequestException(status.creditNotes?.message || 'El servicio todavía no habilita las notas de crédito');
+    if (note.reasonCode==='01' && !status.creditNotes.cancellationReady) throw new BadRequestException('El facturador todavía no habilita las notas de crédito por anulación');
     if (status.issuerRuc!==note.issuer.documentNumber || status.environment!==note.environment || original.environment!==note.environment) throw new BadRequestException('El RUC o ambiente del facturador no coincide con el comprobante original');
     if (branch.sunatEstablishmentCode && note.issuer.establishmentCode!==branch.sunatEstablishmentCode) throw new BadRequestException('El establecimiento del comprobante original no coincide con la configuración actual');
     const claimed=await this.notes.claimDraft(id,branch.id!,userId);

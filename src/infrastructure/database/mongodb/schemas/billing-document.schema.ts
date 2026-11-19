@@ -8,6 +8,14 @@ export class BillingDocument {
   @Prop({ type:Number, default:0, min:0 })
   creditNoteRevision: number;
 
+  @Prop({ type:Number, default:0 }) reissueRevision: number;
+  @Prop({ type:MongoSchema.Types.ObjectId, ref:'BillingCreditNote' }) cancelledByCreditNote?: Types.ObjectId;
+  @Prop() cancelledAt?: Date;
+  @Prop() cancellationReason?: string;
+  @Prop({ type:MongoSchema.Types.ObjectId, ref:'BillingDocument' }) replacesDocument?: Types.ObjectId;
+  @Prop({ type:MongoSchema.Types.ObjectId, ref:'BillingCreditNote' }) reissueCreditNote?: Types.ObjectId;
+  @Prop({ type:MongoSchema.Types.ObjectId, ref:'BillingDocument' }) replacementDocument?: Types.ObjectId;
+
   @Prop({ type: MongoSchema.Types.ObjectId, ref: 'BranchDocument', required: true })
   branch: Types.ObjectId;
 

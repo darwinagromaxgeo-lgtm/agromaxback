@@ -35,7 +35,7 @@ export class MongoBillingCreditNoteRepository implements IBillingCreditNoteRepos
           result=this.entity(existing); return;
         }
         // Serialize reservations on the original document. Concurrent partial returns cannot overspend it.
-        const original:any=await this.originals.findOneAndUpdate({ _id:originalId, branch:branchId, status:'ACCEPTED' }, { $inc:{ creditNoteRevision:1 } }, { new:true, session }).lean().exec();
+        const original:any=await this.originals.findOneAndUpdate({ _id:originalId, branch:branchId, status:'ACCEPTED', cancelledByCreditNote:{$exists:false} }, { $inc:{ creditNoteRevision:1 } }, { new:true, session }).lean().exec();
         if (!original) throw new ConflictException('El comprobante original no está aceptado en esta sucursal');
         const previous:any[]=await this.model.find({ originalDocument:originalId, branch:branchId }).session(session).lean().exec();
         if (previous.some(note=>note.holdsReservation)) throw new ConflictException('Ya existe una nota de crédito en borrador o pendiente de resolver para este comprobante. Ábrela desde Notas de crédito');
@@ -64,13 +64,31 @@ export class MongoBillingCreditNoteRepository implements IBillingCreditNoteRepos
     if (changed.matchedCount !== 1) throw new ConflictException('La nota de crédito cambió durante el envío');
   }
   async saveResult(id:string, branchId:string, result:BillingSubmissionResult) {
-    const doc=await this.model.findOneAndUpdate({ _id:id, branch:branchId, status:{ $in:['SENDING','PENDING','UNKNOWN'] } }, { $set:{ ...result, holdsReservation:!['ACCEPTED','REJECTED'].includes(result.status), ...(result.pdfBase64 ? { hasPdf:true } : {}), ...(result.xmlBase64 ? { hasXml:true } : {}), ...(result.cdrBase64 ? { hasCdr:true } : {}) } }, { new:true, runValidators:true }).lean().exec();
-    if (!doc) {
-      const current=await this.findById(id,branchId);
-      if (current && ['ACCEPTED','REJECTED'].includes(current.status)) return current;
-      throw new ConflictException('No se pudo guardar la respuesta de la nota de crédito');
-    }
-    return this.entity(doc);
+    const session=await this.model.db.startSession();
+    let saved:BillingCreditNoteEntity;
+    try {
+      await session.withTransaction(async()=>{
+        const doc:any=await this.model.findOneAndUpdate({ _id:id, branch:branchId, status:{ $in:['SENDING','PENDING','UNKNOWN'] } }, { $set:{ ...result, holdsReservation:!['ACCEPTED','REJECTED'].includes(result.status), ...(result.pdfBase64 ? { hasPdf:true } : {}), ...(result.xmlBase64 ? { hasXml:true } : {}), ...(result.cdrBase64 ? { hasCdr:true } : {}) } }, { new:true, runValidators:true,session }).select('+cdrBase64').lean().exec();
+        if (!doc) {
+          const current:any=await this.model.findOne({_id:id,branch:branchId}).session(session).lean().exec();
+          if (current && ['ACCEPTED','REJECTED'].includes(current.status)) {saved=this.entity(current);return;}
+          throw new ConflictException('No se pudo guardar la respuesta de la nota de crédito');
+        }
+        if (doc.reasonCode==='01' && doc.status==='ACCEPTED') {
+          if (doc.sunatCode!=='0' || !doc.cdrBase64 || Buffer.from(doc.cdrBase64,'base64').subarray(0,2).toString()!=='PK') throw new ConflictException('La anulación requiere la constancia de SUNAT aceptada');
+          const original:any=await this.originals.findOne({_id:doc.originalDocument,branch:branchId,status:'ACCEPTED'}).session(session).lean().exec();
+          const cents=(value:number)=>Math.round(value*100);
+          const complete=original && original.company.equals(doc.company) && original.sale.equals(doc.sale)
+            && cents(doc.total)===cents(original.total) && cents(doc.taxAmount)===cents(original.taxAmount)
+            && doc.items.length===original.items.length && new Set(doc.items.map((line:any)=>line.originalItemIndex)).size===original.items.length
+            && doc.items.every((line:any)=>{const source=original.items[line.originalItemIndex];return source && line.productId===source.productId && line.quantity===source.quantity && cents(line.baseAmount)===cents(source.baseAmount) && cents(line.taxAmount)===cents(source.taxAmount);});
+          if (!complete || (original.cancelledByCreditNote && !original.cancelledByCreditNote.equals(doc._id))) throw new ConflictException('La nota no anula exactamente el comprobante original');
+          await this.originals.updateOne({_id:original._id,branch:branchId},{$set:{activeSlot:false,cancelledByCreditNote:doc._id,cancelledAt:new Date(),cancellationReason:doc.reasonDescription},$inc:{creditNoteRevision:1}},{session}).exec();
+        }
+        saved=this.entity(doc);
+      },{readConcern:{level:'snapshot'},writeConcern:{w:'majority'}});
+      return saved!;
+    } finally {await session.endSession();}
   }
   async artifact(id:string, branchId:string, format:'pdf'|'xml'|'cdr') {
     const field=`${format}Base64`;

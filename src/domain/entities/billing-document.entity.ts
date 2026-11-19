@@ -68,6 +68,12 @@ export interface BillingDocumentEntity {
   summaryNumber?: number;
   summaryDate?: string;
   boletaSubmissionMode?: 'individual' | 'summary';
+  cancelledByCreditNoteId?: string;
+  cancelledAt?: Date;
+  cancellationReason?: string;
+  replacesDocumentId?: string;
+  reissueAfterCreditNoteId?: string;
+  replacementDocumentId?: string;
 }
 
 export interface BillingSubmissionResult {
@@ -93,7 +99,7 @@ export interface BillingProviderStatus {
   boletaSubmissionMode?: 'individual' | 'summary';
   series?: { FACTURA: string; BOLETA: string };
   supportedDocumentTypes: BillingDocumentType[];
-  creditNotes?: { ready:boolean; series:{ FACTURA:string; BOLETA:string }; message:string };
+  creditNotes?: { ready:boolean; cancellationReady?:boolean; series:{ FACTURA:string; BOLETA:string }; message:string };
   message: string;
 }
 

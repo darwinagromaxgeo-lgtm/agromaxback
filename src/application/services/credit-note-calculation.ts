@@ -27,11 +27,13 @@ export function creditNoteAvailability(original: BillingDocumentEntity, notes: B
 }
 
 export function buildCreditNote(original: BillingDocumentEntity, notes: BillingCreditNoteEntity[], request: CreditNoteRequest): BillingCreditNoteEntity {
+  if (original.cancelledByCreditNoteId) throw new BadRequestException('El comprobante ya está anulado mediante una nota de crédito');
   const available = creditNoteAvailability(original, notes);
-  if (!['TOTAL', 'PARTIAL'].includes(request.returnType) || !request.reason?.trim() || request.reason.trim().length > 500) throw new BadRequestException('Indica el tipo de devolución y su motivo (hasta 500 caracteres)');
+  if (!['CANCEL', 'TOTAL', 'PARTIAL'].includes(request.returnType) || !request.reason?.trim() || request.reason.trim().length > 500) throw new BadRequestException('Indica el tipo de nota y su motivo (hasta 500 caracteres)');
   if (/[\u0000-\u0008\u000b\u000c\u000e-\u001f]/.test(request.reason)) throw new BadRequestException('El motivo contiene caracteres no válidos');
-  if (request.returnType === 'TOTAL' && request.items?.length) throw new BadRequestException('La devolución total utiliza todo el saldo disponible; no envíes un detalle parcial');
-  const selection = request.returnType === 'TOTAL' ? available.filter(line => line.availableQuantity > 0).map(line => ({ itemIndex:line.itemIndex, quantity:line.availableQuantity })) : request.items || [];
+  if (request.returnType !== 'PARTIAL' && request.items?.length) throw new BadRequestException('La anulación o devolución total utiliza el comprobante completo; no envíes un detalle parcial');
+  if (request.returnType === 'CANCEL' && available.some(line=>line.creditedQuantity>0)) throw new BadRequestException('La anulación completa requiere un comprobante sin notas previas aceptadas o pendientes');
+  const selection = request.returnType !== 'PARTIAL' ? available.filter(line => line.availableQuantity > 0).map(line => ({ itemIndex:line.itemIndex, quantity:line.availableQuantity })) : request.items || [];
   if (!selection.length || selection.length > 200 || new Set(selection.map(line => line.itemIndex)).size !== selection.length) throw new BadRequestException('Selecciona al menos un producto, sin repetir renglones');
   const items = selection.map(selected => {
     const source = available[selected.itemIndex];
@@ -52,7 +54,7 @@ export function buildCreditNote(original: BillingDocumentEntity, notes: BillingC
     branchId:original.branchId, companyId:original.companyId, saleId:original.saleId,
     documentType:'NOTA_CREDITO', originalDocumentId:original.id!, originalDocumentType:original.documentType,
     originalSeries:original.series!, originalNumber:original.number!, originalIssuedAt:original.submittedAt!,
-    reasonCode:complete ? '06' : '07', reasonDescription:request.reason.trim(),
+    reasonCode:request.returnType === 'CANCEL' ? '01' : complete ? '06' : '07', reasonDescription:request.reason.trim(),
     taxType:original.taxType, currency:original.currency, issuer:{ ...original.issuer }, receiver:{ ...original.receiver },
     status:'DRAFT', items, taxableAmount:sum('baseAmount','GRAVADO'), exemptAmount:sum('baseAmount','EXONERADO'), unaffectedAmount:sum('baseAmount','INAFECTO'), taxAmount:sum('taxAmount'), total:sum('total'),
     paymentCondition:original.paymentCondition, saleDate:original.saleDate, environment:original.environment,

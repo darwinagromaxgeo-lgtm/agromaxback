@@ -12,7 +12,7 @@ export const BillingCreditNoteSchema = new Schema<any>({
   originalDocumentType: { type:String, enum:['FACTURA','BOLETA'], required:true },
   originalSeries: { type:String, required:true }, originalNumber:{ type:Number, required:true },
   originalIssuedAt: { type:Date, required:true },
-  reasonCode:{ type:String, enum:['06','07'], required:true }, reasonDescription:{ type:String, required:true },
+  reasonCode:{ type:String, enum:['01','06','07'], required:true }, reasonDescription:{ type:String, required:true },
   requestId:{ type:String, required:true }, requestHash:{ type:String, required:true },
   holdsReservation:{ type:Boolean, default:true },
 }, { timestamps:true, collection:'billing_credit_notes' });

@@ -7,7 +7,7 @@ class CreditNoteItemDto {
 }
 export class PreviewCreditNoteDto {
   @IsMongoId() originalDocumentId: string;
-  @IsIn(['TOTAL','PARTIAL']) returnType: 'TOTAL' | 'PARTIAL';
+  @IsIn(['CANCEL','TOTAL','PARTIAL']) returnType: 'CANCEL' | 'TOTAL' | 'PARTIAL';
   @IsString() @MinLength(1) @MaxLength(500) reason: string;
   @IsOptional() @IsArray() @ArrayMaxSize(200) @ValidateNested({ each:true }) @Type(() => CreditNoteItemDto)
   items?: CreditNoteItemDto[];

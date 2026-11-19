@@ -8,6 +8,7 @@ const { NestFactory, Reflector } = require('@nestjs/core');
 const mongoose = require('mongoose');
 const { buildCreditNote, creditNoteAvailability } = require('../dist/application/services/credit-note-calculation');
 const { BillingCreditNoteService } = require('../dist/application/services/billing-credit-note.service');
+const { BillingService } = require('../dist/application/services/billing.service');
 const { GreenterBillingProvider } = require('../dist/infrastructure/billing/greenter-billing.provider');
 const { BillingCreditNoteSchema } = require('../dist/infrastructure/database/mongodb/schemas/billing-credit-note.schema');
 const { BillingDocumentSchema, BillingCounterSchema } = require('../dist/infrastructure/database/mongodb/schemas/billing-document.schema');
@@ -47,10 +48,90 @@ test('full returns use 06; a later return of the remaining balance uses 07',()=>
   const rest=buildCreditNote(source,[first],{ returnType:'TOTAL',reason:'Devolución restante' });
   assert.equal(rest.reasonCode,'07');assert.equal(rest.items[0].quantity,2);assert.equal(rest.total,2);
 });
+test('cancellation uses reason 01 for the complete original and refuses previously credited or cancelled documents',()=>{
+  const source=original();
+  const note=buildCreditNote(source,[],{returnType:'CANCEL',reason:'Anular comprobante para emitir uno nuevo'});
+  assert.equal(note.reasonCode,'01');assert.equal(note.total,source.total);assert.equal(note.items[0].quantity,3);
+  assert.deepEqual(note.receiver,source.receiver);
+  assert.throws(()=>buildCreditNote(source,[{...buildCreditNote(source,[],partial(1)),status:'ACCEPTED'}],{returnType:'CANCEL',reason:'Anular'}),/sin notas previas/);
+  assert.throws(()=>buildCreditNote({...source,cancelledByCreditNoteId:ids.foreign},[],{returnType:'CANCEL',reason:'Anular'}),/ya está anulado/);
+  assert.throws(()=>buildCreditNote(source,[],{returnType:'CANCEL',reason:'Anular',items:[{itemIndex:0,quantity:1}]}),/comprobante completo/);
+});
 test('pending, unknown and draft returns hold quantities; rejected and discarded ones release them',()=>{
   const source=original(),note=buildCreditNote(source,[],partial(2));
   for(const status of ['DRAFT','SENDING','PENDING','UNKNOWN','ACCEPTED']) assert.equal(creditNoteAvailability(source,[{...note,status}])[0].availableQuantity,1,status);
   for(const status of ['REJECTED','DISCARDED']) assert.equal(creditNoteAvailability(source,[{...note,status}])[0].availableQuantity,3,status);
+});
+
+test('accepted fiscal cancellation unlocks exactly one replacement without changing the order, money or inventory',{skip:!process.env.AGROMAX_TEST_MONGO_URI},async()=>{
+  assert.match(process.env.AGROMAX_TEST_MONGO_URI,/^mongodb:\/\/(127\.0\.0\.1|localhost):/);
+  const connection=await mongoose.createConnection(process.env.AGROMAX_TEST_MONGO_URI,{dbName:'cancellation_'+randomUUID().replace(/-/g,'')}).asPromise();
+  try {
+    const originals=connection.model('BillingDocument',BillingDocumentSchema.clone());
+    const notes=connection.model('BillingCreditNote',BillingCreditNoteSchema.clone());
+    const counters=connection.model('BillingCounter',BillingCounterSchema.clone());
+    const documents=new MongoBillingDocumentRepository(originals,counters);
+    const repository=new MongoBillingCreditNoteRepository(notes,originals);
+    await documents.onModuleInit();await repository.onModuleInit();
+    const source=original({number:10});const {id,branchId,companyId,saleId,...data}=source;
+    await originals.create({...data,_id:id,branch:branchId,company:companyId,sale:saleId,xmlBase64:Buffer.from('<Invoice/>').toString('base64'),pdfBase64:Buffer.from('%PDF-old').toString('base64')});
+    const sale={id:saleId,branchId,total:3,isCancelled:false,items:source.items,payments:[{amount:3,paymentMethodId:ids.foreign}]};
+    await connection.collection('sales').insertOne({...sale,_id:new mongoose.Types.ObjectId(saleId)});
+    await connection.collection('stocks').insertOne({product:ids.product,branch:branchId,quantity:5});
+    await connection.collection('cash_registers').insertOne({sale:saleId,amount:3});
+    const before={sale:await connection.collection('sales').findOne({}),stock:await connection.collection('stocks').findOne({}),cash:await connection.collection('cash_registers').findOne({})};
+    assert.equal(await documents.reserveNumber(source.issuer.documentNumber,'FAG1','beta',10),10);
+    let submissions=0,queries=0;
+    const provider={getStatus:async()=>({ready:true,environment:'beta',issuerRuc:source.issuer.documentNumber,supportedDocumentTypes:['FACTURA','BOLETA'],series:{FACTURA:'FAG1',BOLETA:'BAG1'},boletaSubmissionMode:'individual',creditNotes:{ready:true,cancellationReady:true,series:{FACTURA:'FNC1',BOLETA:'BNC1'}}}),getCreditNoteNumberingStart:()=>1,getNumberingStart:()=>1,submitCreditNote:async()=>{submissions++;return submissions===1?{status:'UNKNOWN',sunatDescription:'Timeout'}:{status:'ACCEPTED',sunatCode:'0',sunatDescription:'Accepted cancellation',cdrBase64:Buffer.from('PKcdr').toString('base64')};},checkCreditNoteStatus:async()=>{queries++;return queries===1?{status:'PENDING',ticket:'fixture-ticket',sunatDescription:'Pending'}:{status:'ACCEPTED',sunatCode:'0',sunatDescription:'Accepted cancellation',cdrBase64:Buffer.from('PKcdr').toString('base64')};},submit:async()=>({status:'ACCEPTED',sunatCode:'0',sunatDescription:'New receipt',cdrBase64:Buffer.from('PKcdr').toString('base64')})};
+    const companies={findById:async()=>({isActive:true,ruc:source.issuer.documentNumber})};
+    const billing=new BillingService(documents,{findById:async()=>structuredClone(sale)},companies,{}, {findById:()=>{throw Error('Historical products must be reused');}},provider);
+    const service=new BillingCreditNoteService(documents,repository,provider,companies);
+    const branch={id:branchId,companyIds:[companyId],billingSeriesCode:'1'};
+    const request={originalDocumentId:id,returnType:'CANCEL',reason:'Anular comprobante; conservar pedido',requestId:randomUUID()};
+    const cancellation=await service.create(request,branch,ids.user);
+    const reissue={saleId,companyId,taxType:'GRAVADO',documentType:'BOLETA',receiver:{name:'CONSUMIDOR FINAL',documentType:'UNIDENTIFIED'},replacesDocumentId:id};
+    await assert.rejects(()=>billing.preview(reissue,branch),/debe aceptarse/);
+    assert.equal((await service.issue(cancellation.id,branch,ids.user)).status,'UNKNOWN');
+    await assert.rejects(()=>billing.preview(reissue,branch),/debe aceptarse/);
+    assert.equal((await service.checkStatus(cancellation.id,branchId)).status,'PENDING');
+    assert.equal((await originals.findById(id).lean()).activeSlot,true);
+    await assert.rejects(()=>billing.preview(reissue,branch),/debe aceptarse/);
+    await assert.rejects(()=>repository.saveResult(cancellation.id,branchId,{status:'ACCEPTED',sunatCode:'0',sunatDescription:'No CDR'}),/constancia/);
+    await assert.rejects(()=>repository.saveResult(cancellation.id,branchId,{status:'ACCEPTED',sunatCode:'2399',cdrBase64:Buffer.from('PKrejected').toString('base64'),sunatDescription:'Wrong CDR code'}),/constancia/);
+    assert.equal((await repository.findById(cancellation.id,branchId)).status,'PENDING');
+    assert.equal((await service.checkStatus(cancellation.id,branchId)).status,'ACCEPTED');
+    const cancelled=await documents.findById(id,branchId);assert.equal(cancelled.cancelledByCreditNoteId,cancellation.id);assert.equal(cancelled.status,'ACCEPTED');
+    assert.equal((await originals.findById(id).lean()).activeSlot,false);assert.equal(await documents.findForSale(saleId,companyId,'GRAVADO',branchId),null);
+    assert.equal(await documents.hasSubmittedSale(saleId),true,'Operational cancellation must remain blocked');
+    await assert.rejects(()=>billing.createDraft({...reissue,replacesDocumentId:undefined},branch,ids.user),/Volver a emitir/);
+    const preview=await billing.preview(reissue,branch);assert.deepEqual(preview.items,source.items);assert.equal(preview.total,3);assert.equal(preview.receiver.documentType,'UNIDENTIFIED');assert.equal(preview.hasCdr,undefined);assert.equal(preview.number,undefined);
+    const attempts=await Promise.allSettled([billing.createDraft(reissue,branch,ids.user),billing.createDraft(reissue,branch,ids.user)]);
+    const completed=attempts.filter(result=>result.status==='fulfilled').map(result=>result.value);
+    assert.ok(completed.length);assert.ok(completed.every(note=>note.id===completed[0].id));assert.equal(await originals.countDocuments(),2);
+    let replacement=completed[0];assert.equal(replacement.replacesDocumentId,id);assert.equal(replacement.reissueAfterCreditNoteId,cancellation.id);assert.equal(replacement.documentType,'BOLETA');
+    const replay=await billing.createDraft(reissue,branch,ids.user);assert.equal(replay.id,replacement.id);
+    assert.equal((await documents.findById(id,branchId)).replacementDocumentId,replacement.id);
+    const discardedId=replacement.id;await billing.discard(discardedId,branchId,'Corregir el borrador antes de emitir',ids.user);
+    replacement=await billing.createDraft(reissue,branch,ids.user);assert.notEqual(replacement.id,discardedId);
+    assert.equal((await documents.findById(id,branchId)).replacementDocumentId,replacement.id);
+    const issued=await billing.issue(replacement.id,branch,ids.user);assert.equal(issued.status,'ACCEPTED');assert.equal(issued.series,'BAG1');assert.equal(issued.number,1);
+    const secondCancellation=await service.create({...request,originalDocumentId:issued.id,requestId:randomUUID()},branch,ids.user);
+    assert.equal((await service.issue(secondCancellation.id,branch,ids.user)).status,'ACCEPTED');
+    await assert.rejects(()=>billing.preview(reissue,branch),/ya fue reemplazado/);
+    const nextDto={...reissue,documentType:'FACTURA',receiver:source.receiver,replacesDocumentId:issued.id};
+    const next=await billing.createDraft(nextDto,branch,ids.user);assert.equal(next.replacesDocumentId,issued.id);
+    const newInvoice=await billing.issue(next.id,branch,ids.user);assert.equal(newInvoice.series,'FAG1');assert.equal(newInvoice.number,11,'Fiscal counters must advance instead of reusing the cancelled number');
+    provider.submitCreditNote=async()=>({status:'REJECTED',sunatCode:'2399',sunatDescription:'Rejected cancellation',cdrBase64:Buffer.from('PKrejected').toString('base64')});
+    const rejected=await service.create({...request,originalDocumentId:newInvoice.id,requestId:randomUUID()},branch,ids.user);
+    assert.equal((await service.issue(rejected.id,branch,ids.user)).status,'REJECTED');
+    assert.equal((await originals.findById(newInvoice.id).lean()).activeSlot,true);
+    assert.equal((await documents.findById(newInvoice.id,branchId)).cancelledByCreditNoteId,undefined);
+    await assert.rejects(()=>billing.preview({...nextDto,replacesDocumentId:newInvoice.id},branch),/debe aceptarse/);
+    assert.deepEqual(await connection.collection('sales').findOne({}),before.sale);assert.deepEqual(await connection.collection('stocks').findOne({}),before.stock);assert.deepEqual(await connection.collection('cash_registers').findOne({}),before.cash);
+    assert.equal((await documents.getArtifact(id,branchId,'xml')).data,Buffer.from('<Invoice/>').toString('base64'));
+    assert.equal((await documents.getArtifact(id,branchId,'pdf')).data,Buffer.from('%PDF-old').toString('base64'));
+    await assert.rejects(()=>billing.preview({...nextDto,saleId:ids.foreign},branch),/mismo pedido/);
+  } finally {await connection.dropDatabase();await connection.close();}
 });
 test('quantities, repeated rows and original fiscal state are validated before issuing',()=>{
   for(const value of [0,-1,NaN,Infinity,4,.0000001]) assert.throws(()=>buildCreditNote(original(),[],partial(value)));
@@ -115,9 +196,10 @@ test('credit-note HTTP routes require authentication, branch access and explicit
 test('real HTTP adapter negotiates credit-note capabilities and sends type 07 to the new endpoints',async()=>{
   const source=original();const note={...buildCreditNote(source,[],partial(1)),series:'FNC1',number:1,submittedAt:new Date()};
   const calls=[];
+  let cancellationEnabled=false;
   const server=createServer(async(request,response)=>{
     response.setHeader('Content-Type','application/json');
-    if(request.url.endsWith('/capabilities')) { response.end(JSON.stringify({apiVersion:'agromax-1',ready:true,environment:'beta',issuer:{ruc:source.issuer.documentNumber,razonSocial:'Emisor'},supportedDocumentTypes:['FACTURA','BOLETA','NOTA_CREDITO'],boletaSubmissionMode:'individual'}));return; }
+    if(request.url.endsWith('/capabilities')) { response.end(JSON.stringify({apiVersion:'agromax-1',ready:true,environment:'beta',issuer:{ruc:source.issuer.documentNumber,razonSocial:'Emisor'},supportedDocumentTypes:['FACTURA','BOLETA','NOTA_CREDITO'],creditNoteReasons:cancellationEnabled?['01','06','07']:['06','07'],boletaSubmissionMode:'individual'}));return; }
     let body='';for await(const chunk of request)body+=chunk;
     calls.push({path:request.url,body:JSON.parse(body),authorization:request.headers.authorization});
     response.end(JSON.stringify({invoiceNumber:'FNC1-00000001',emisorRuc:source.issuer.documentNumber,environment:'beta',status:'ACCEPTED',sunatResponse:{code:'0',description:'Accepted fixture'},cdrBase64:Buffer.from('PKfixture').toString('base64')}));
@@ -127,6 +209,8 @@ test('real HTTP adapter negotiates credit-note capabilities and sends type 07 to
     const settings={GREENTER_SERVICE_URL:`http://127.0.0.1:${server.address().port}`,GREENTER_API_KEY:'offline-key',GREENTER_ISSUER_RUC:source.issuer.documentNumber,GREENTER_ENVIRONMENT:'beta',GREENTER_ENABLED:'true',GREENTER_BRANCH_NUMBERING:'true',GREENTER_FACTURA_NEXT_NUMBER:'1',GREENTER_BOLETA_NEXT_NUMBER:'1'};
     const provider=new GreenterBillingProvider({get:key=>settings[key]});
     const status=await provider.getStatus('1');assert.equal(status.creditNotes.ready,true);assert.deepEqual(status.creditNotes.series,{FACTURA:'FNC1',BOLETA:'BNC1'});
+    assert.equal(status.creditNotes.cancellationReady,false);cancellationEnabled=true;
+    assert.equal((await provider.getStatus('1')).creditNotes.cancellationReady,true);
     assert.equal((await provider.submitCreditNote(note)).status,'ACCEPTED');assert.equal((await provider.checkCreditNoteStatus(note)).status,'ACCEPTED');
     assert.deepEqual(calls.map(call=>call.path),['/api/agromax/credit-notes/generate','/api/agromax/credit-notes/status']);
     assert.equal(calls[0].body.tipoDoc,'07');assert.equal(calls[0].body.tipDocAfectado,'01');assert.equal(calls[0].body.numDocAfectado,'FAG1-00000001');assert.equal(calls[1].body.tipoDoc,'07');assert.equal(calls[0].authorization,'Bearer offline-key');

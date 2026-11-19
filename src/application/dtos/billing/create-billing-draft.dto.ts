@@ -5,6 +5,8 @@ import { BillingReceiverDto } from './billing-receiver.dto';
 import { BillingDocumentType, BillingTaxType } from '../../../domain/entities/billing-document.entity';
 
 export class CreateBillingDraftDto {
+  @IsOptional() @IsMongoId()
+  replacesDocumentId?: string;
   @IsOptional() @ValidateNested() @Type(() => BillingReceiverDto)
   receiver?: BillingReceiverDto;
   @ApiProperty()

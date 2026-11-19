@@ -1,4 +1,4 @@
-import { Injectable, OnModuleInit } from '@nestjs/common';
+import { ConflictException, Injectable, OnModuleInit } from '@nestjs/common';
 import { InjectModel } from '@nestjs/mongoose';
 import { Model, Types } from 'mongoose';
 import { BillingDocumentEntity, BillingPartySnapshot, BillingSubmissionResult, BillingTaxType } from '../../../../domain/entities/billing-document.entity';
@@ -46,6 +46,11 @@ export class MongoBillingDocumentRepository implements IBillingDocumentRepositor
     return document ? this.toEntity(document) : null;
   }
 
+  async findCancelledForSale(saleId:string,companyId:string,taxType:BillingTaxType,branchId:string) {
+    const document=await this.model.findOne({sale:saleId,company:companyId,taxType,branch:branchId,cancelledByCreditNote:{$exists:true}}).sort({cancelledAt:-1}).lean().exec();
+    return document ? this.toEntity(document) : null;
+  }
+
   async hasSubmittedSale(saleId: string) {
     return !!await this.model.exists({ sale: saleId, status: { $in: ['SENDING', 'PENDING', 'ACCEPTED', 'UNKNOWN'] } });
   }
@@ -55,9 +60,30 @@ export class MongoBillingDocumentRepository implements IBillingDocumentRepositor
   }
 
   async createDraft(document: BillingDocumentEntity) {
+    if (document.replacesDocumentId) return this.createReissue(document);
     const { id, branchId, companyId, saleId, ...data } = document;
     const saved = await this.model.create({ ...data, branch: branchId, company: companyId, sale: saleId });
     return this.toEntity(saved.toObject());
+  }
+
+  private async createReissue(document:BillingDocumentEntity) {
+    const session=await this.model.db.startSession();
+    let saved:BillingDocumentEntity;
+    try {
+      await session.withTransaction(async()=>{
+        const original:any=await this.model.findOneAndUpdate({_id:document.replacesDocumentId,branch:document.branchId,status:'ACCEPTED',activeSlot:false,cancelledByCreditNote:{$exists:true}},{$inc:{reissueRevision:1}},{new:true,session}).lean().exec();
+        if (!original || !original.cancelledByCreditNote.equals(document.reissueAfterCreditNoteId) || original.sale.toString()!==document.saleId || original.company.toString()!==document.companyId || original.taxType!==document.taxType) throw new ConflictException('La nueva emisión requiere la anulación aceptada del comprobante original');
+        if (original.replacementDocument) {
+          const replacement=await this.model.findOne({_id:original.replacementDocument,branch:document.branchId}).session(session).lean().exec();
+          if (replacement && replacement.status!=='DISCARDED') {saved=this.toEntity(replacement);return;}
+        }
+        const {id,branchId,companyId,saleId,replacesDocumentId,reissueAfterCreditNoteId,...data}=document;
+        const created=await this.model.create([{...data,branch:branchId,company:companyId,sale:saleId,replacesDocument:replacesDocumentId,reissueCreditNote:reissueAfterCreditNoteId}],{session});
+        await this.model.updateOne({_id:original._id,branch:branchId},{$set:{replacementDocument:created[0]._id}},{session}).exec();
+        saved=this.toEntity(created[0].toObject());
+      },{readConcern:{level:'snapshot'},writeConcern:{w:'majority'}});
+      return saved!;
+    } finally {await session.endSession();}
   }
 
   async discard(id: string, branchId: string, reason: string, userId: string) {
@@ -143,13 +169,17 @@ export class MongoBillingDocumentRepository implements IBillingDocumentRepositor
   }
 
   private toEntity(document: any): BillingDocumentEntity {
-    const { _id, branch, company, sale, __v, activeSlot, pdfBase64, xmlBase64, cdrBase64, ...data } = document;
+    const { _id, branch, company, sale, __v, activeSlot, pdfBase64, xmlBase64, cdrBase64, cancelledByCreditNote, replacesDocument, reissueCreditNote, replacementDocument, creditNoteRevision, reissueRevision, ...data } = document;
     return {
       ...data,
       id: _id.toString(),
       branchId: branch.toString(),
       companyId: company.toString(),
       saleId: sale.toString(),
+      cancelledByCreditNoteId:cancelledByCreditNote?.toString(),
+      replacesDocumentId:replacesDocument?.toString(),
+      reissueAfterCreditNoteId:reissueCreditNote?.toString(),
+      replacementDocumentId:replacementDocument?.toString(),
       createdBy: data.createdBy?.toString(),
       discardedBy: data.discardedBy?.toString(),
       submittedBy: data.submittedBy?.toString(),

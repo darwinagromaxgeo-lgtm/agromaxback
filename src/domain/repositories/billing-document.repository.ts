@@ -15,6 +15,7 @@ export interface IBillingDocumentRepository {
   findAll(filter: BillingDocumentFilter, page: number, limit: number): Promise<{ data: BillingDocumentEntity[]; total: number }>;
   findById(id: string, branchId: string): Promise<BillingDocumentEntity | null>;
   findForSale(saleId: string, companyId: string, taxType: BillingTaxType, branchId: string): Promise<BillingDocumentEntity | null>;
+  findCancelledForSale(saleId:string,companyId:string,taxType:BillingTaxType,branchId:string): Promise<BillingDocumentEntity | null>;
   hasSubmittedSale(saleId: string): Promise<boolean>;
   hasActiveSale(saleId: string): Promise<boolean>;
   createDraft(document: BillingDocumentEntity): Promise<BillingDocumentEntity>;
