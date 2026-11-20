@@ -190,7 +190,8 @@ test('real Nest + MongoDB + independent PHP service simulate separate invoices a
     await request('PUT', `/branches/${objectId(8002)}`, { billingSeriesCode: '3' }, 400);
     const { BillingDocumentSchema, BillingCounterSchema } = require('../dist/infrastructure/database/mongodb/schemas/billing-document.schema');
     const { MongoBillingDocumentRepository } = require('../dist/infrastructure/database/mongodb/repositories/mongo-billing-document.repository');
-    const repository = new MongoBillingDocumentRepository(database.model('TestBilling', BillingDocumentSchema, 'billing_documents'), database.model('TestCounter', BillingCounterSchema, 'billing_counters'));
+    const { SaleSchema } = require('../dist/infrastructure/database/mongodb/schemas/sale.schema');
+    const repository = new MongoBillingDocumentRepository(database.model('TestBilling', BillingDocumentSchema, 'billing_documents'), database.model('TestCounter', BillingCounterSchema, 'billing_counters'), database.model('TestFiscalSale', SaleSchema, 'sales'));
     await repository.onModuleInit();
     const changes = await Promise.all(['CLIENTE A', 'CLIENTE B'].map(name => repository.updateReceiver(lastReceiverDraft.id, objectId(8002), { ...lastReceiverDraft.receiver, name }, objectId(8003), 1)));
     assert.equal(changes.filter(Boolean).length, 1, 'Only one concurrent receiver edit can win the revision');

@@ -6,10 +6,15 @@ import { BillingDocumentEntity, BillingSubmissionResult } from '../../../../doma
 import { IBillingCreditNoteRepository } from '../../../../domain/repositories/billing-credit-note.repository';
 import { BillingCreditNote } from '../schemas/billing-credit-note.schema';
 import { BillingDocument } from '../schemas/billing-document.schema';
+import { SaleDocument } from '../schemas/sale.schema';
 
 @Injectable()
 export class MongoBillingCreditNoteRepository implements IBillingCreditNoteRepository, OnModuleInit {
-  constructor(@InjectModel(BillingCreditNote.name) private readonly model:Model<any>, @InjectModel(BillingDocument.name) private readonly originals:Model<any>) {}
+  constructor(
+    @InjectModel(BillingCreditNote.name) private readonly model:Model<any>,
+    @InjectModel(BillingDocument.name) private readonly originals:Model<any>,
+    @InjectModel(SaleDocument.name) private readonly sales:Model<any>,
+  ) {}
   async onModuleInit() { await this.model.init(); }
 
   private entity(document:any): BillingCreditNoteEntity {
@@ -83,7 +88,12 @@ export class MongoBillingCreditNoteRepository implements IBillingCreditNoteRepos
             && doc.items.length===original.items.length && new Set(doc.items.map((line:any)=>line.originalItemIndex)).size===original.items.length
             && doc.items.every((line:any)=>{const source=original.items[line.originalItemIndex];return source && line.productId===source.productId && line.quantity===source.quantity && cents(line.baseAmount)===cents(source.baseAmount) && cents(line.taxAmount)===cents(source.taxAmount);});
           if (!complete || (original.cancelledByCreditNote && !original.cancelledByCreditNote.equals(doc._id))) throw new ConflictException('La nota no anula exactamente el comprobante original');
+          // Serialize fiscal changes on the sale: two tax groups can be cancelled concurrently.
+          const sale=await this.sales.findOneAndUpdate({_id:doc.sale,branch:doc.branch,isCancelled:{$ne:true}},{$inc:{__v:1}},{new:true,session}).lean().exec();
+          if (!sale) throw new ConflictException('No se encontró la venta activa de este comprobante en la sucursal');
           await this.originals.updateOne({_id:original._id,branch:branchId},{$set:{activeSlot:false,cancelledByCreditNote:doc._id,cancelledAt:new Date(),cancellationReason:doc.reasonDescription},$inc:{creditNoteRevision:1}},{session}).exec();
+          const otherActive=await this.originals.exists({sale:doc.sale,branch:doc.branch,activeSlot:true}).session(session);
+          if (!otherActive) await this.sales.updateOne({_id:doc.sale,branch:doc.branch},{$set:{voucherType:'NONE'}},{session}).exec();
         }
         saved=this.entity(doc);
       },{readConcern:{level:'snapshot'},writeConcern:{w:'majority'}});

@@ -4,12 +4,14 @@ import { Model, Types } from 'mongoose';
 import { BillingDocumentEntity, BillingPartySnapshot, BillingSubmissionResult, BillingTaxType } from '../../../../domain/entities/billing-document.entity';
 import { BillingDocumentFilter, IBillingDocumentRepository } from '../../../../domain/repositories/billing-document.repository';
 import { BillingCounter, BillingCounterDoc, BillingDocument, BillingDocumentDoc } from '../schemas/billing-document.schema';
+import { SaleDocument } from '../schemas/sale.schema';
 
 @Injectable()
 export class MongoBillingDocumentRepository implements IBillingDocumentRepository, OnModuleInit {
   constructor(
     @InjectModel(BillingDocument.name) private readonly model: Model<BillingDocumentDoc>,
     @InjectModel(BillingCounter.name) private readonly counters: Model<BillingCounterDoc>,
+    @InjectModel(SaleDocument.name) private readonly sales: Model<any>,
   ) {}
 
   async onModuleInit() {
@@ -139,6 +141,28 @@ export class MongoBillingDocumentRepository implements IBillingDocumentRepositor
   }
 
   async saveSubmissionResult(id: string, branchId: string, result: BillingSubmissionResult) {
+    if (result.status === 'ACCEPTED') {
+      const session = await this.model.db.startSession();
+      let accepted: BillingDocumentEntity;
+      try {
+        await session.withTransaction(async () => {
+          const document = await this.model.findOneAndUpdate(
+            { _id: id, branch: branchId, status: { $in: ['SENDING', 'PENDING'] } },
+            { $set: { ...result, ...(result.pdfBase64 ? { hasPdf: true } : {}), ...(result.xmlBase64 ? { hasXml: true } : {}), ...(result.cdrBase64 ? { hasCdr: true } : {}) } },
+            { new: true, runValidators: true, session },
+          ).lean().exec();
+          if (!document) throw new ConflictException('No se pudo guardar la respuesta del comprobante');
+          const sale = await this.sales.findOneAndUpdate(
+            { _id: document.sale, branch: document.branch, isCancelled: { $ne: true } },
+            { $set: { voucherType: document.documentType }, $inc: { __v: 1 } },
+            { new: true, session },
+          ).lean().exec();
+          if (!sale) throw new ConflictException('No se encontró la venta activa de este comprobante en la sucursal');
+          accepted = this.toEntity(document);
+        }, { readConcern: { level: 'snapshot' }, writeConcern: { w: 'majority' } });
+        return accepted!;
+      } finally { await session.endSession(); }
+    }
     const document = await this.model.findOneAndUpdate(
       { _id: id, branch: branchId, status: { $in: ['SENDING', 'PENDING'] } },
       { $set: {

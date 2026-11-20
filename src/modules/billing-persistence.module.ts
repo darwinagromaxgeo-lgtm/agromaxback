@@ -6,12 +6,14 @@ import { BillingCounter, BillingCounterSchema, BillingDocument, BillingDocumentS
 import { BillingCreditNote, BillingCreditNoteSchema } from '../infrastructure/database/mongodb/schemas/billing-credit-note.schema';
 import { BILLING_CREDIT_NOTE_REPOSITORY } from '../domain/repositories/billing-credit-note.repository';
 import { MongoBillingCreditNoteRepository } from '../infrastructure/database/mongodb/repositories/mongo-billing-credit-note.repository';
+import { SaleDocument, SaleSchema } from '../infrastructure/database/mongodb/schemas/sale.schema';
 
 @Module({
   imports: [MongooseModule.forFeature([
     { name: BillingDocument.name, schema: BillingDocumentSchema },
     { name: BillingCounter.name, schema: BillingCounterSchema },
     { name: BillingCreditNote.name, schema: BillingCreditNoteSchema },
+    { name: SaleDocument.name, schema: SaleSchema },
   ])],
   providers: [{ provide: BILLING_DOCUMENT_REPOSITORY, useClass: MongoBillingDocumentRepository }, { provide:BILLING_CREDIT_NOTE_REPOSITORY, useClass:MongoBillingCreditNoteRepository }],
   exports: [BILLING_DOCUMENT_REPOSITORY, BILLING_CREDIT_NOTE_REPOSITORY],

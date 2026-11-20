@@ -14,6 +14,7 @@ const { BillingCreditNoteSchema } = require('../dist/infrastructure/database/mon
 const { BillingDocumentSchema, BillingCounterSchema } = require('../dist/infrastructure/database/mongodb/schemas/billing-document.schema');
 const { MongoBillingDocumentRepository } = require('../dist/infrastructure/database/mongodb/repositories/mongo-billing-document.repository');
 const { MongoBillingCreditNoteRepository } = require('../dist/infrastructure/database/mongodb/repositories/mongo-billing-credit-note.repository');
+const { SaleSchema } = require('../dist/infrastructure/database/mongodb/schemas/sale.schema');
 const { validationPipe } = require('../dist/presentation/pipes/validation.pipe');
 const { CreateCreditNoteDto } = require('../dist/application/dtos/billing/credit-note.dto');
 const { BillingCreditNoteController } = require('../dist/presentation/controllers/billing-credit-note.controller');
@@ -70,13 +71,14 @@ test('accepted fiscal cancellation unlocks exactly one replacement without chang
     const originals=connection.model('BillingDocument',BillingDocumentSchema.clone());
     const notes=connection.model('BillingCreditNote',BillingCreditNoteSchema.clone());
     const counters=connection.model('BillingCounter',BillingCounterSchema.clone());
-    const documents=new MongoBillingDocumentRepository(originals,counters);
-    const repository=new MongoBillingCreditNoteRepository(notes,originals);
+    const sales=connection.model('SaleDocument',SaleSchema.clone());
+    const documents=new MongoBillingDocumentRepository(originals,counters,sales);
+    const repository=new MongoBillingCreditNoteRepository(notes,originals,sales);
     await documents.onModuleInit();await repository.onModuleInit();
     const source=original({number:10});const {id,branchId,companyId,saleId,...data}=source;
     await originals.create({...data,_id:id,branch:branchId,company:companyId,sale:saleId,xmlBase64:Buffer.from('<Invoice/>').toString('base64'),pdfBase64:Buffer.from('%PDF-old').toString('base64')});
     const sale={id:saleId,branchId,total:3,isCancelled:false,items:source.items,payments:[{amount:3,paymentMethodId:ids.foreign}]};
-    await connection.collection('sales').insertOne({...sale,_id:new mongoose.Types.ObjectId(saleId)});
+    await sales.create({_id:saleId,branch:branchId,company:companyId,total:sale.total,voucherType:'FACTURA',date:new Date(),items:source.items.map(item=>({product:item.productId,company:companyId,quantity:item.quantity,unitPrice:item.unitPrice,subtotal:item.total,priceTier:'Minorista'})),payments:[{paymentMethod:ids.foreign,paymentMethodName:'Efectivo',amount:3}]});
     await connection.collection('stocks').insertOne({product:ids.product,branch:branchId,quantity:5});
     await connection.collection('cash_registers').insertOne({sale:saleId,amount:3});
     const before={sale:await connection.collection('sales').findOne({}),stock:await connection.collection('stocks').findOne({}),cash:await connection.collection('cash_registers').findOne({})};
@@ -92,14 +94,17 @@ test('accepted fiscal cancellation unlocks exactly one replacement without chang
     const reissue={saleId,companyId,taxType:'GRAVADO',documentType:'BOLETA',receiver:{name:'CONSUMIDOR FINAL',documentType:'UNIDENTIFIED'},replacesDocumentId:id};
     await assert.rejects(()=>billing.preview(reissue,branch),/debe aceptarse/);
     assert.equal((await service.issue(cancellation.id,branch,ids.user)).status,'UNKNOWN');
+    assert.equal((await sales.findById(saleId).lean()).voucherType,'FACTURA');
     await assert.rejects(()=>billing.preview(reissue,branch),/debe aceptarse/);
     assert.equal((await service.checkStatus(cancellation.id,branchId)).status,'PENDING');
+    assert.equal((await sales.findById(saleId).lean()).voucherType,'FACTURA');
     assert.equal((await originals.findById(id).lean()).activeSlot,true);
     await assert.rejects(()=>billing.preview(reissue,branch),/debe aceptarse/);
     await assert.rejects(()=>repository.saveResult(cancellation.id,branchId,{status:'ACCEPTED',sunatCode:'0',sunatDescription:'No CDR'}),/constancia/);
     await assert.rejects(()=>repository.saveResult(cancellation.id,branchId,{status:'ACCEPTED',sunatCode:'2399',cdrBase64:Buffer.from('PKrejected').toString('base64'),sunatDescription:'Wrong CDR code'}),/constancia/);
     assert.equal((await repository.findById(cancellation.id,branchId)).status,'PENDING');
     assert.equal((await service.checkStatus(cancellation.id,branchId)).status,'ACCEPTED');
+    assert.equal((await sales.findById(saleId).lean()).voucherType,'NONE','The accepted cancellation automatically restores the internal sales note');
     const cancelled=await documents.findById(id,branchId);assert.equal(cancelled.cancelledByCreditNoteId,cancellation.id);assert.equal(cancelled.status,'ACCEPTED');
     assert.equal((await originals.findById(id).lean()).activeSlot,false);assert.equal(await documents.findForSale(saleId,companyId,'GRAVADO',branchId),null);
     assert.equal(await documents.hasSubmittedSale(saleId),true,'Operational cancellation must remain blocked');
@@ -115,24 +120,76 @@ test('accepted fiscal cancellation unlocks exactly one replacement without chang
     replacement=await billing.createDraft(reissue,branch,ids.user);assert.notEqual(replacement.id,discardedId);
     assert.equal((await documents.findById(id,branchId)).replacementDocumentId,replacement.id);
     const issued=await billing.issue(replacement.id,branch,ids.user);assert.equal(issued.status,'ACCEPTED');assert.equal(issued.series,'BAG1');assert.equal(issued.number,1);
+    assert.equal((await sales.findById(saleId).lean()).voucherType,'BOLETA','An accepted replacement restores its fiscal type');
     const secondCancellation=await service.create({...request,originalDocumentId:issued.id,requestId:randomUUID()},branch,ids.user);
     assert.equal((await service.issue(secondCancellation.id,branch,ids.user)).status,'ACCEPTED');
     await assert.rejects(()=>billing.preview(reissue,branch),/ya fue reemplazado/);
     const nextDto={...reissue,documentType:'FACTURA',receiver:source.receiver,replacesDocumentId:issued.id};
     const next=await billing.createDraft(nextDto,branch,ids.user);assert.equal(next.replacesDocumentId,issued.id);
     const newInvoice=await billing.issue(next.id,branch,ids.user);assert.equal(newInvoice.series,'FAG1');assert.equal(newInvoice.number,11,'Fiscal counters must advance instead of reusing the cancelled number');
+    assert.equal((await sales.findById(saleId).lean()).voucherType,'FACTURA');
+    const beforeReplay=await sales.findById(saleId).lean();
+    await repository.saveResult(cancellation.id,branchId,{status:'ACCEPTED',sunatCode:'0',sunatDescription:'Repeated status response'});
+    assert.deepEqual(await sales.findById(saleId).lean(),beforeReplay,'A replayed cancellation must not change the accepted replacement');
     provider.submitCreditNote=async()=>({status:'REJECTED',sunatCode:'2399',sunatDescription:'Rejected cancellation',cdrBase64:Buffer.from('PKrejected').toString('base64')});
     const rejected=await service.create({...request,originalDocumentId:newInvoice.id,requestId:randomUUID()},branch,ids.user);
     assert.equal((await service.issue(rejected.id,branch,ids.user)).status,'REJECTED');
     assert.equal((await originals.findById(newInvoice.id).lean()).activeSlot,true);
     assert.equal((await documents.findById(newInvoice.id,branchId)).cancelledByCreditNoteId,undefined);
     await assert.rejects(()=>billing.preview({...nextDto,replacesDocumentId:newInvoice.id},branch),/debe aceptarse/);
-    assert.deepEqual(await connection.collection('sales').findOne({}),before.sale);assert.deepEqual(await connection.collection('stocks').findOne({}),before.stock);assert.deepEqual(await connection.collection('cash_registers').findOne({}),before.cash);
+    const commercialFields=({voucherType,__v,updatedAt,...data})=>data;
+    assert.deepEqual(commercialFields(await connection.collection('sales').findOne({})),commercialFields(before.sale));assert.deepEqual(await connection.collection('stocks').findOne({}),before.stock);assert.deepEqual(await connection.collection('cash_registers').findOne({}),before.cash);
     assert.equal((await documents.getArtifact(id,branchId,'xml')).data,Buffer.from('<Invoice/>').toString('base64'));
     assert.equal((await documents.getArtifact(id,branchId,'pdf')).data,Buffer.from('%PDF-old').toString('base64'));
     await assert.rejects(()=>billing.preview({...nextDto,saleId:ids.foreign},branch),/mismo pedido/);
   } finally {await connection.dropDatabase();await connection.close();}
 });
+test('only the final accepted cancellation resets the sale, including concurrent tax groups and foreign-branch rollback',{skip:!process.env.AGROMAX_TEST_MONGO_URI},async()=>{
+  assert.match(process.env.AGROMAX_TEST_MONGO_URI,/^mongodb:\/\/(127\.0\.0\.1|localhost):/);
+  const connection=await mongoose.createConnection(process.env.AGROMAX_TEST_MONGO_URI,{dbName:'sale_note_'+randomUUID().replace(/-/g,'')}).asPromise();
+  try {
+    const originals=connection.model('BillingDocument',BillingDocumentSchema.clone());
+    const notes=connection.model('BillingCreditNote',BillingCreditNoteSchema.clone());
+    const sales=connection.model('SaleDocument',SaleSchema.clone());
+    const repository=new MongoBillingCreditNoteRepository(notes,originals,sales);
+    await repository.onModuleInit();await originals.init();
+    const saleId=String(new mongoose.Types.ObjectId());
+    await sales.create({_id:saleId,branch:ids.branch,total:6,voucherType:'FACTURA',date:new Date(),items:[{product:ids.product,company:ids.company,quantity:6,unitPrice:1,subtotal:6,priceTier:'Minorista'}],payments:[{paymentMethod:ids.foreign,paymentMethodName:'Efectivo',amount:6}]});
+    async function staged(sale,index,taxType='GRAVADO') {
+      const source=original({id:String(new mongoose.Types.ObjectId()),saleId:sale,number:index,...(taxType==='EXONERADO'?{taxType,items:[{...original().items[0],taxType,taxRate:0,baseAmount:3,taxAmount:0}],taxableAmount:0,exemptAmount:3,taxAmount:0}:{})});
+      const {id,branchId,companyId,saleId:linked,...data}=source;
+      await originals.create({...data,_id:id,branch:branchId,company:companyId,sale:linked});
+      const note=await repository.createDraft(id,branchId,randomUUID(),randomUUID(),()=>buildCreditNote(source,[],{returnType:'CANCEL',reason:'Error de registro'}));
+      await repository.claimDraft(note.id,branchId,ids.user);
+      return {source,note};
+    }
+    const first=await staged(saleId,101),second=await staged(saleId,102,'EXONERADO');
+    const accepted={status:'ACCEPTED',sunatCode:'0',sunatDescription:'Accepted fixture',cdrBase64:Buffer.from('PKfixture').toString('base64')};
+    await repository.saveResult(first.note.id,ids.branch,accepted);
+    assert.equal((await sales.findById(saleId).lean()).voucherType,'FACTURA','Another active tax group still exists');
+    await repository.saveResult(second.note.id,ids.branch,{status:'PENDING',sunatDescription:'Awaiting result'});
+    assert.equal((await sales.findById(saleId).lean()).voucherType,'FACTURA');
+    await repository.saveResult(second.note.id,ids.branch,accepted);
+    assert.equal((await sales.findById(saleId).lean()).voucherType,'NONE');
+
+    const concurrentSale=String(new mongoose.Types.ObjectId());
+    await sales.create({_id:concurrentSale,branch:ids.branch,total:6,voucherType:'BOLETA',date:new Date(),items:[{product:ids.product,company:ids.company,quantity:6,unitPrice:1,subtotal:6,priceTier:'Minorista'}],payments:[]});
+    const left=await staged(concurrentSale,201),right=await staged(concurrentSale,202,'EXONERADO');
+    await Promise.all([repository.saveResult(left.note.id,ids.branch,accepted),repository.saveResult(right.note.id,ids.branch,accepted)]);
+    assert.equal((await sales.findById(concurrentSale).lean()).voucherType,'NONE','Concurrent completions must serialize on the sale');
+    assert.equal(await originals.countDocuments({sale:concurrentSale,activeSlot:true}),0);
+
+    const foreignSale=String(new mongoose.Types.ObjectId());
+    await sales.create({_id:foreignSale,branch:ids.foreign,total:3,voucherType:'FACTURA',date:new Date(),items:[{product:ids.product,company:ids.company,quantity:3,unitPrice:1,subtotal:3,priceTier:'Minorista'}],payments:[]});
+    const invalid=await staged(foreignSale,301);
+    await assert.rejects(()=>repository.saveResult(invalid.note.id,ids.branch,accepted),/venta activa/);
+    assert.equal((await repository.findById(invalid.note.id,ids.branch)).status,'SENDING','A failed update must roll back the saved fiscal result');
+    assert.equal((await originals.findById(invalid.source.id).lean()).activeSlot,true);
+    assert.equal((await sales.findById(foreignSale).lean()).voucherType,'FACTURA');
+    for(const collection of ['stocks','cash_registers','credit_accounts'])assert.equal(await connection.collection(collection).countDocuments(),0);
+  } finally {await connection.dropDatabase();await connection.close();}
+});
+
 test('quantities, repeated rows and original fiscal state are validated before issuing',()=>{
   for(const value of [0,-1,NaN,Infinity,4,.0000001]) assert.throws(()=>buildCreditNote(original(),[],partial(value)));
   assert.throws(()=>buildCreditNote(original(),[],{ ...partial(1),items:[{itemIndex:0,quantity:1},{itemIndex:0,quantity:1}] }),/sin repetir/);
@@ -223,7 +280,8 @@ test('Mongo transactions serialize returns, preserve invoice snapshots, and reco
   try {
     const originals=connection.model('BillingDocument',BillingDocumentSchema.clone());
     const notes=connection.model('BillingCreditNote',BillingCreditNoteSchema.clone());
-    const repository=new MongoBillingCreditNoteRepository(notes,originals);await repository.onModuleInit();
+    const sales=connection.model('SaleDocument',SaleSchema.clone());
+    const repository=new MongoBillingCreditNoteRepository(notes,originals,sales);await repository.onModuleInit();
     const source=original();const {id,branchId,companyId,saleId,...data}=source;
     await originals.create({...data,_id:id,branch:branchId,company:companyId,sale:saleId});
     const build=(original,previous)=>({...buildCreditNote(original,previous,partial(1)),createdBy:ids.user});
@@ -246,7 +304,7 @@ test('Mongo transactions serialize returns, preserve invoice snapshots, and reco
     const discarded=await repository.discard(next.id,branchId,'Corregir selección',ids.user);assert.equal(discarded.status,'DISCARDED');
     const remaining=await repository.createDraft(id,branchId,randomUUID(),'5',(original,previous)=>buildCreditNote(original,previous,{returnType:'TOTAL',reason:'Devolución restante'}));assert.equal(remaining.total,2);
     const counters=connection.model('BillingCounter',BillingCounterSchema.clone());
-    const documents=new MongoBillingDocumentRepository(originals,counters);await documents.onModuleInit();
+    const documents=new MongoBillingDocumentRepository(originals,counters,sales);await documents.onModuleInit();
     // The first note above already used number 1. The next reservation must advance it.
     assert.equal(await documents.reserveNumber(source.issuer.documentNumber,'FNC1','beta',1),1);
     let submitted=0,queried=0;
