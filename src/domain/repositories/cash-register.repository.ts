@@ -6,6 +6,7 @@ export interface ICashRegisterRepository {
   findById(id: string, branchId?: string): Promise<CashRegisterEntity | null>;
   findAll(filter?: { branchId?: string; startDate?: string; endDate?: string; status?: string }, page?: number, limit?: number): Promise<{ data: CashRegisterEntity[]; total: number }>;
   update(id: string, data: Partial<CashRegisterEntity>, branchId?: string): Promise<CashRegisterEntity | null>;
+  closeIfUnchanged(id: string, revision: number, data: Partial<CashRegisterEntity>): Promise<CashRegisterEntity | null>;
   adjustOpeningBalance(
     id: string,
     newBalance: number,
@@ -13,6 +14,7 @@ export interface ICashRegisterRepository {
   ): Promise<CashRegisterEntity | null>;
   addEntry(id: string, entry: any, branchId?: string): Promise<CashRegisterEntity | null>;
   updateEntry(registerId: string, entryId: string, data: any, branchId?: string): Promise<CashRegisterEntity | null>;
+  updateOpenEntry(registerId: string, entryId: string, data: any): Promise<CashRegisterEntity | null>;
 }
 
 export const CASH_REGISTER_REPOSITORY = 'CASH_REGISTER_REPOSITORY';

@@ -1,4 +1,4 @@
-import { Module, forwardRef } from '@nestjs/common';
+import { Module } from '@nestjs/common';
 import { BillingPersistenceModule } from './billing-persistence.module';
 import { MongooseModule } from '@nestjs/mongoose';
 import { CashRegisterDocument, CashRegisterSchema } from '../infrastructure/database/mongodb/schemas/cash-register.schema';
@@ -13,16 +13,12 @@ import { AdjustOpeningBalanceUseCase } from '../application/use-cases/cash-regis
 import { GetCashRegistersUseCase } from '../application/use-cases/cash-register/get-cash-registers.use-case';
 import { GetCashRegisterByDateUseCase } from '../application/use-cases/cash-register/get-cash-register-by-date.use-case';
 import { CashRegisterController } from '../presentation/controllers/cash-register.controller';
-import { SaleModule } from './sale.module';
-import { StockModule } from './stock.module';
-import { ProductModule } from './product.module';
-import { CreditAccountModule } from './credit-account.module';
-import { StockMovementModule } from './stock-movement.module';
+import { PaymentMethodModule } from './payment-method.module';
 
 @Module({
   imports: [
     MongooseModule.forFeature([{ name: CashRegisterDocument.name, schema: CashRegisterSchema }]),
-    forwardRef(() => SaleModule), StockModule, ProductModule, CreditAccountModule, StockMovementModule, BillingPersistenceModule,
+    BillingPersistenceModule, PaymentMethodModule,
   ],
   controllers: [CashRegisterController],
   providers: [

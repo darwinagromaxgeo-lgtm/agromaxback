@@ -1,4 +1,4 @@
-import { IsString, IsNumber, IsEnum, IsOptional, Min, ValidateNested, IsDateString } from 'class-validator';
+import { IsString, IsNumber, IsEnum, IsOptional, Min, ValidateNested, IsDateString, IsMongoId, IsNotEmpty } from 'class-validator';
 import { Type } from 'class-transformer';
 import { CashRegisterEntryType, CashRegisterEntryCategory } from '../../../domain/enums';
 
@@ -11,8 +11,9 @@ export class RemisionGuiaDto {
 export class AddEntryDto {
   @IsEnum(CashRegisterEntryType) type: CashRegisterEntryType;
   @IsEnum(CashRegisterEntryCategory) category: CashRegisterEntryCategory;
-  @IsString() description: string;
-  @IsNumber() @Min(0.01) amount: number;
+  @IsString() @IsNotEmpty() description: string;
+  @IsNumber({ maxDecimalPlaces: 2 }) @Min(0.01) amount: number;
+  @IsOptional() @IsMongoId() paymentMethodId?: string;
   @IsOptional() @IsString() referenceId?: string;
   @IsOptional() @IsString() referenceType?: string;
   @IsOptional() @IsString() voucherType?: string;

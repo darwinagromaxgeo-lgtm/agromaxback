@@ -1,4 +1,4 @@
-import { Injectable } from '@nestjs/common';
+import { Injectable, ConflictException } from '@nestjs/common';
 import { InjectModel } from '@nestjs/mongoose';
 import { Model } from 'mongoose';
 import { ICashRegisterRepository } from '../../../../domain/repositories/cash-register.repository';
@@ -51,7 +51,13 @@ export class MongoCashRegisterRepository implements ICashRegisterRepository {
   }
 
   async update(id: string, data: Partial<CashRegisterEntity>): Promise<CashRegisterEntity | null> {
-    const doc = await this.model.findByIdAndUpdate(id, { $set: data }, { new: true }).lean().exec();
+    const doc = await this.model.findByIdAndUpdate(id, { $set: data, $inc: { __v: 1 } }, { new: true }).lean().exec();
+    return doc ? this.toEntity(doc) : null;
+  }
+
+  async closeIfUnchanged(id: string, revision: number, data: Partial<CashRegisterEntity>): Promise<CashRegisterEntity | null> {
+    const version = revision === 0 ? { $or: [{ __v: 0 }, { __v: { $exists: false } }] } : { __v: revision };
+    const doc = await this.model.findOneAndUpdate({ _id: id, status: 'OPEN', ...version }, { $set: data, $inc: { __v: 1 } }, { new: true }).lean().exec();
     return doc ? this.toEntity(doc) : null;
   }
 
@@ -60,23 +66,36 @@ export class MongoCashRegisterRepository implements ICashRegisterRepository {
     newBalance: number,
     historyEntry: { previousAmount: number; newAmount: number; reason: string; adjustedBy?: string; adjustedAt: Date },
   ): Promise<CashRegisterEntity | null> {
-    const doc = await this.model.findByIdAndUpdate(
-      id,
+    const doc = await this.model.findOneAndUpdate(
+      { _id: id, status: 'OPEN' },
       {
         $set: { openingBalance: newBalance },
         $push: { openingBalanceHistory: historyEntry },
+        $inc: { __v: 1 },
       },
       { new: true },
     ).lean().exec();
-    return doc ? this.toEntity(doc) : null;
+    if (!doc) throw new ConflictException('La caja cambió o fue cerrada. Actualiza la pantalla');
+    return this.toEntity(doc);
   }
 
   async addEntry(id: string, entry: any): Promise<CashRegisterEntity | null> {
-    const doc = await this.model.findByIdAndUpdate(id, { $push: { entries: entry } }, { new: true }).lean().exec();
-    return doc ? this.toEntity(doc) : null;
+    const doc = await this.model.findOneAndUpdate({ _id: id, status: 'OPEN' }, { $push: { entries: entry }, $inc: { __v: 1 } }, { new: true }).lean().exec();
+    if (!doc) throw new ConflictException('La caja cambió o fue cerrada. Actualiza la pantalla');
+    return this.toEntity(doc);
   }
 
   async updateEntry(registerId: string, entryId: string, data: any): Promise<CashRegisterEntity | null> {
+    return this.writeEntry(registerId, entryId, data, false);
+  }
+
+  async updateOpenEntry(registerId: string, entryId: string, data: any): Promise<CashRegisterEntity | null> {
+    const result = await this.writeEntry(registerId, entryId, data, true);
+    if (!result) throw new ConflictException('La caja cambió o fue cerrada. Actualiza la pantalla');
+    return result;
+  }
+
+  private async writeEntry(registerId: string, entryId: string, data: any, onlyOpen: boolean): Promise<CashRegisterEntity | null> {
     const setFields: any = {};
     const pushFields: any = {};
     for (const [key, value] of Object.entries(data)) {
@@ -88,12 +107,12 @@ export class MongoCashRegisterRepository implements ICashRegisterRepository {
         setFields[`entries.$.${key}`] = value;
       }
     }
-    const update: any = {};
+    const update: any = { $inc: { __v: 1 } };
     if (Object.keys(setFields).length > 0) update.$set = setFields;
     if (Object.keys(pushFields).length > 0) update.$push = pushFields;
 
     const doc = await this.model.findOneAndUpdate(
-      { _id: registerId, 'entries._id': entryId },
+      { _id: registerId, ...(onlyOpen ? { status: 'OPEN', entries: { $elemMatch: { _id: entryId, isDeleted: { $ne: true } } } } : { 'entries._id': entryId }) },
       update,
       { new: true },
     ).lean().exec();
@@ -103,6 +122,8 @@ export class MongoCashRegisterRepository implements ICashRegisterRepository {
   private toEntity(doc: any): CashRegisterEntity {
     return {
       id: doc._id.toString(),
+      branchId: doc.branch?.toString(),
+      revision: doc.__v || 0,
       date: doc.date,
       openingBalance: doc.openingBalance,
       openingBalanceHistory: (doc.openingBalanceHistory || []).map((h: any) => ({
@@ -119,6 +140,10 @@ export class MongoCashRegisterRepository implements ICashRegisterRepository {
         category: e.category,
         description: e.description,
         amount: e.amount,
+        paymentMethodId: e.paymentMethodId?.toString(),
+        paymentMethodName: e.paymentMethodName,
+        paymentGroupId: e.paymentGroupId,
+        paymentGroupTotal: e.paymentGroupTotal,
         referenceId: e.referenceId?.toString(),
         referenceType: e.referenceType,
         voucherType: e.voucherType || (e.hasBoleta ? 'BOLETA' : 'NONE'),
@@ -134,11 +159,15 @@ export class MongoCashRegisterRepository implements ICashRegisterRepository {
           reason: h.reason,
           editedBy: h.editedBy?.toString(),
           editedAt: h.editedAt,
+          previousPaymentMethodName: h.previousPaymentMethodName,
+          newPaymentMethodName: h.newPaymentMethodName,
         })),
         createdBy: e.createdBy?.toString(),
         createdAt: e.createdAt,
+        remisionGuia: e.remisionGuia,
       })),
       closingBalance: doc.closingBalance,
+      cashCount: doc.cashCount,
       closedBy: doc.closedBy?.toString(),
       closedAt: doc.closedAt,
       notes: doc.notes,

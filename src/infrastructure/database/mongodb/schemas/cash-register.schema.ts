@@ -18,6 +18,9 @@ export class EditHistorySubdoc {
 
   @Prop({ default: Date.now })
   editedAt: Date;
+
+  @Prop() previousPaymentMethodName?: string;
+  @Prop() newPaymentMethodName?: string;
 }
 
 export const EditHistorySubdocSchema = SchemaFactory.createForClass(EditHistorySubdoc);
@@ -27,7 +30,7 @@ export class CashRegisterEntrySubdoc {
   @Prop({ type: String, enum: ['INCOME', 'EXPENSE'], required: true })
   type: string;
 
-  @Prop({ type: String, enum: ['SALE', 'CREDIT_PAYMENT', 'PURCHASE', 'ADJUSTMENT', 'OTHER'], required: true })
+  @Prop({ type: String, enum: ['SALE', 'CREDIT_PAYMENT', 'PURCHASE', 'ADJUSTMENT', 'OTHER', 'OPERATING_EXPENSE', 'WITHDRAWAL', 'CAPITAL_CONTRIBUTION'], required: true })
   category: string;
 
   @Prop({ required: true })
@@ -35,6 +38,13 @@ export class CashRegisterEntrySubdoc {
 
   @Prop({ required: true })
   amount: number;
+
+  @Prop({ type: MongooseSchema.Types.ObjectId, ref: 'PaymentMethodDocument' })
+  paymentMethodId?: Types.ObjectId;
+
+  @Prop() paymentMethodName?: string;
+  @Prop() paymentGroupId?: string;
+  @Prop() paymentGroupTotal?: number;
 
   @Prop({ type: MongooseSchema.Types.ObjectId })
   referenceId: Types.ObjectId;
@@ -120,6 +130,9 @@ export class CashRegisterDocument {
 
   @Prop()
   closingBalance: number;
+
+  @Prop({ type: MongooseSchema.Types.Mixed })
+  cashCount?: { expectedAmount: number; countedAmount: number; difference: number; methods: any[] };
 
   @Prop({ type: MongooseSchema.Types.ObjectId, ref: 'UserDocument' })
   closedBy: Types.ObjectId;

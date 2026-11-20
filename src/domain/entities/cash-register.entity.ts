@@ -4,14 +4,19 @@ export interface CashRegisterEditHistory {
   reason: string;
   editedBy: string;
   editedAt: Date;
+  previousPaymentMethodName?: string;
+  newPaymentMethodName?: string;
 }
 
 export interface CashRegisterEntryEntity {
   id?: string;
   type: 'INCOME' | 'EXPENSE';
-  category: 'SALE' | 'CREDIT_PAYMENT' | 'PURCHASE' | 'ADJUSTMENT' | 'OTHER';
+  category: 'SALE' | 'CREDIT_PAYMENT' | 'PURCHASE' | 'ADJUSTMENT' | 'OTHER' | 'OPERATING_EXPENSE' | 'WITHDRAWAL' | 'CAPITAL_CONTRIBUTION';
   description: string;
   amount: number;
+  paymentMethodId?: string;
+  paymentMethodName?: string;
+  createdAt?: Date;
   referenceId?: string;
   referenceType?: string;
   voucherType: string;
@@ -42,6 +47,13 @@ export interface CashRegisterEntity {
   status: 'OPEN' | 'CLOSED';
   entries: CashRegisterEntryEntity[];
   closingBalance?: number;
+  cashCount?: {
+    expectedAmount: number;
+    countedAmount: number;
+    difference: number;
+    methods: { key: string; name: string; income: number; expense: number; net: number; isCash: boolean }[];
+  };
+  revision?: number;
   closedBy?: string;
   closedAt?: Date;
   notes?: string;

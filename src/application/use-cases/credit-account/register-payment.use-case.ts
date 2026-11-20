@@ -36,6 +36,7 @@ export class RegisterPaymentUseCase {
       category: CashRegisterEntryCategory.CREDIT_PAYMENT,
       description: `Pago credito - ${clientName} [${paymentMethod.name}]`,
       amount: dto.amount,
+      paymentMethodId: dto.paymentMethodId,
       referenceId: creditId,
       referenceType: 'CreditAccount',
     }, userId);

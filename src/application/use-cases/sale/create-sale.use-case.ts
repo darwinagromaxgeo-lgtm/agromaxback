@@ -221,6 +221,7 @@ export class CreateSaleUseCase {
           category: CashRegisterEntryCategory.SALE,
           description: `${description} [${payment.paymentMethodName}]`,
           amount: payment.amount,
+          paymentMethodId: payment.paymentMethodId,
           referenceId: sale.id,
           referenceType: 'Sale',
           voucherType: dto.voucherType || 'NONE',

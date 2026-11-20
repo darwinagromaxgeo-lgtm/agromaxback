@@ -1,4 +1,4 @@
-import { Controller, Get, Post, Patch, Delete, Body, Param, Query, Inject } from '@nestjs/common';
+import { Controller, Get, Post, Patch, Delete, Body, Param, Query, Inject, BadRequestException } from '@nestjs/common';
 import { BranchScoped } from '../../common/decorators/branch-scoped.decorator';
 import { ApiTags, ApiOperation, ApiBearerAuth, ApiParam, ApiQuery } from '@nestjs/swagger';
 import { OpenCashRegisterUseCase } from '../../application/use-cases/cash-register/open-cash-register.use-case';
@@ -75,6 +75,9 @@ export class CashRegisterController {
   @ApiOperation({ summary: 'Agregar entrada a caja', description: 'Agrega una entrada de ingreso o egreso a la caja del dia (debe estar abierta)' })
   @ApiParam({ name: 'id', description: 'ID de la caja' })
   async createEntry(@Param('id') id: string, @Body() dto: AddEntryDto, @CurrentUser('id') userId: string) {
+    if (dto.referenceId || dto.referenceType || ['SALE', 'CREDIT_PAYMENT'].includes(dto.category)) {
+      throw new BadRequestException('Las ventas y abonos deben registrarse desde Ventas o Créditos para mantener sus saldos vinculados');
+    }
     return this.addEntry.execute(id, dto, userId);
   }
 

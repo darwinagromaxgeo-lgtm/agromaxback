@@ -255,7 +255,7 @@ test('sale cancellation, linked cash deletion and credit deletion stop before si
   const sale = { id: ids.sale, isCancelled: false, items: [] };
   const cancel = new CancelSaleUseCase({ findById: async () => sale }, { upsert: fail }, {}, {}, {}, {}, {}, bills);
   await assert.rejects(cancel.execute(ids.sale, 'Prueba', ids.user), /comprobante/);
-  const deleteCash = new DeleteEntryUseCase({ findById: async () => ({ status: 'OPEN', entries: [{ id: 'entry', referenceType: 'Sale', referenceId: ids.sale }] }), updateEntry: fail }, {}, {}, {}, {}, {}, bills);
+  const deleteCash = new DeleteEntryUseCase({ findById: async () => ({ status: 'OPEN', entries: [{ id: 'entry', referenceType: 'Sale', referenceId: ids.sale }] }), updateEntry: fail }, bills);
   await assert.rejects(deleteCash.execute('register', 'entry', { reason: 'Prueba' }, ids.user), /comprobante/);
   const deleteCredit = new DeleteCreditUseCase({ findById: async () => ({ saleIds: [ids.sale] }), delete: fail }, {}, {}, {}, {}, {}, bills);
   await assert.rejects(deleteCredit.execute('credit', ids.user), /comprobante/);

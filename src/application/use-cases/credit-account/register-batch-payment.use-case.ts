@@ -21,7 +21,7 @@ export class RegisterBatchPaymentUseCase {
 
   async execute(dto: RegisterBatchPaymentDto, userId?: string) {
     const paymentMethod = await this.paymentMethodRepo.findById(dto.paymentMethodId);
-    if (!paymentMethod) throw new BadRequestException('Método de pago no encontrado');
+    if (!paymentMethod || !paymentMethod.isActive) throw new BadRequestException('Método de pago no encontrado o inactivo');
 
     const register = await this.openCashRegister.execute({}, userId);
     const client = await this.clientRepo.findById(dto.clientId);
@@ -66,6 +66,8 @@ export class RegisterBatchPaymentUseCase {
         category: 'CREDIT_PAYMENT',
         description: `Pago crédito - ${clientName} [${paymentMethod.name}]`,
         amount: alloc.amount,
+        paymentMethodId: paymentMethod.id,
+        paymentMethodName: paymentMethod.name,
         referenceId: alloc.creditId,
         referenceType: 'CreditAccount',
         voucherType: 'NONE',
