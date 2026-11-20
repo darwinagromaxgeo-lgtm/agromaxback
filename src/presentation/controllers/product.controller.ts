@@ -1,3 +1,4 @@
+import { SellerAccess } from '../../common/decorators/seller-access.decorator';
 import { Controller, Get, Post, Put, Delete, Body, Param, Query, UploadedFile, UseInterceptors, BadRequestException } from '@nestjs/common';
 import { FileInterceptor } from '@nestjs/platform-express';
 import { memoryStorage } from 'multer';
@@ -40,6 +41,7 @@ export class ProductController {
 
   @Get()
   @ApiOperation({ summary: 'Listar productos', description: 'Obtiene lista paginada de productos con filtros opcionales' })
+  @SellerAccess()
   async findAll(@Query() filter: FilterProductDto, @Query('isActive') isActiveRaw?: string) {
     const isActive = isActiveRaw === undefined ? undefined : isActiveRaw === 'true';
     return this.getProducts.execute({ ...filter, isActive });

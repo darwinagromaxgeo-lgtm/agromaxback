@@ -1,3 +1,4 @@
+import { SellerAccess } from '../../common/decorators/seller-access.decorator';
 import { Controller, Get, Param, Query } from '@nestjs/common';
 import { ApiTags, ApiBearerAuth, ApiOperation, ApiParam, ApiQuery } from '@nestjs/swagger';
 import { LookupService } from '../../application/services/lookup.service';
@@ -5,6 +6,7 @@ import { LookupService } from '../../application/services/lookup.service';
 @ApiTags('Lookup')
 @ApiBearerAuth('JWT')
 @Controller('lookup')
+@SellerAccess()
 export class LookupController {
   constructor(private readonly lookupService: LookupService) {}
 

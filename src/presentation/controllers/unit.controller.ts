@@ -1,3 +1,4 @@
+import { SellerAccess } from '../../common/decorators/seller-access.decorator';
 import { Controller, Get, Post, Put, Delete, Body, Param } from '@nestjs/common';
 import { ApiTags, ApiOperation, ApiBearerAuth, ApiParam } from '@nestjs/swagger';
 import { CreateUnitUseCase } from '../../application/use-cases/unit/create-unit.use-case';
@@ -26,6 +27,7 @@ export class UnitController {
 
   @Get()
   @ApiOperation({ summary: 'Listar unidades de medida' })
+  @SellerAccess()
   async findAll() {
     return this.getUnits.execute();
   }

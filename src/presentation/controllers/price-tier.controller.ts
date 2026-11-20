@@ -1,3 +1,4 @@
+import { SellerAccess } from '../../common/decorators/seller-access.decorator';
 import { Controller, Get, Post, Put, Body, Param, Query } from '@nestjs/common';
 import { ApiTags, ApiOperation, ApiBearerAuth, ApiParam, ApiQuery } from '@nestjs/swagger';
 import { CreatePriceTierUseCase } from '../../application/use-cases/price-tier/create-price-tier.use-case';
@@ -25,6 +26,7 @@ export class PriceTierController {
   @Get()
   @ApiOperation({ summary: 'Listar rangos de precio', description: 'Obtiene todos los rangos de precio (filtro opcional por activos)' })
   @ApiQuery({ name: 'activeOnly', required: false, description: 'Si es false, incluye inactivos (default: true)' })
+  @SellerAccess()
   async findAll(@Query('activeOnly') activeOnly?: string) { return this.getPriceTiers.execute(activeOnly !== 'false'); }
 
   @Put(':id')

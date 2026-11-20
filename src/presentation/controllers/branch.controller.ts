@@ -1,3 +1,4 @@
+import { SellerAccess } from '../../common/decorators/seller-access.decorator';
 import { Body, Controller, Get, Param, Patch, Post, Put } from '@nestjs/common';
 import { ApiBearerAuth, ApiOperation, ApiTags } from '@nestjs/swagger';
 import { CreateBranchDto } from '../../application/dtos/branch/create-branch.dto';
@@ -14,6 +15,7 @@ export class BranchController {
 
   @Get('accessible')
   @ApiOperation({ summary: 'Listar sucursales disponibles para el usuario actual' })
+  @SellerAccess()
   accessible(@CurrentUser('id') userId: string, @CurrentUser('role') role: string) {
     return this.manageBranches.accessible(userId, role);
   }

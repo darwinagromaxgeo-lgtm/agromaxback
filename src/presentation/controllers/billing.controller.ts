@@ -1,3 +1,4 @@
+import { SellerAccess } from '../../common/decorators/seller-access.decorator';
 import { Body, Controller, Get, Param, Post, Query, Res, StreamableFile } from '@nestjs/common';
 import { ApiBearerAuth, ApiOperation, ApiTags } from '@nestjs/swagger';
 import { Response } from 'express';
@@ -18,6 +19,7 @@ import { UpdateBillingReceiverDto } from '../../application/dtos/billing/billing
 @BranchScoped()
 @Roles('ADMIN', 'VENDEDOR')
 @Controller('billing')
+@SellerAccess()
 export class BillingController {
   constructor(private readonly billing: BillingService) {}
 

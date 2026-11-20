@@ -1,3 +1,4 @@
+import { SellerAccess } from '../../common/decorators/seller-access.decorator';
 import { Controller, Get, Post, Patch, Body, Param, Query, Req } from '@nestjs/common';
 import { BranchScoped } from '../../common/decorators/branch-scoped.decorator';
 import { ApiTags, ApiOperation, ApiBearerAuth } from '@nestjs/swagger';
@@ -14,6 +15,7 @@ import { CurrentBranch } from '../../common/decorators/current-branch.decorator'
 @ApiBearerAuth('JWT')
 @Controller('quotes')
 @BranchScoped()
+@SellerAccess()
 export class QuoteController {
   constructor(
     private readonly createQuote: CreateQuoteUseCase,

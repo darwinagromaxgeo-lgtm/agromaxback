@@ -1,3 +1,4 @@
+import { SellerAccess } from '../../common/decorators/seller-access.decorator';
 import { Controller, Get, Post, Patch, Query, Body, Param } from '@nestjs/common';
 import { BranchScoped } from '../../common/decorators/branch-scoped.decorator';
 import { ApiTags, ApiOperation, ApiBearerAuth } from '@nestjs/swagger';
@@ -32,6 +33,7 @@ export class ProductLotController {
 
   @Get()
   @ApiOperation({ summary: 'Listar lotes de producto por empresa o producto' })
+  @SellerAccess()
   async findAll(
     @Query('companyId') companyId?: string,
     @Query('productId') productId?: string,

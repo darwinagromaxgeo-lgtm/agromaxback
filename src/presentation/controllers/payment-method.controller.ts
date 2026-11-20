@@ -1,3 +1,4 @@
+import { SellerAccess } from '../../common/decorators/seller-access.decorator';
 import { Controller, Get, Post, Patch, Body, Param } from '@nestjs/common';
 import { ApiTags, ApiOperation, ApiBearerAuth, ApiParam } from '@nestjs/swagger';
 import { ManagePaymentMethodsUseCase } from '../../application/use-cases/payment-method/manage-payment-methods.use-case';
@@ -19,6 +20,7 @@ export class PaymentMethodController {
 
   @Get()
   @ApiOperation({ summary: 'Listar métodos de pago', description: 'Obtiene todos los métodos de pago registrados' })
+  @SellerAccess()
   async findAll() {
     return this.managePaymentMethods.findAll();
   }

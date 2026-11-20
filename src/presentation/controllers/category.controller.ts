@@ -1,3 +1,4 @@
+import { SellerAccess } from '../../common/decorators/seller-access.decorator';
 import { Controller, Get, Post, Put, Delete, Body, Param } from '@nestjs/common';
 import { ApiTags, ApiOperation, ApiBearerAuth, ApiParam } from '@nestjs/swagger';
 import { CreateCategoryUseCase } from '../../application/use-cases/category/create-category.use-case';
@@ -26,6 +27,7 @@ export class CategoryController {
 
   @Get()
   @ApiOperation({ summary: 'Listar categorías', description: 'Obtiene todas las categorías registradas' })
+  @SellerAccess()
   async findAll() {
     return this.getCategories.execute();
   }

@@ -1,3 +1,4 @@
+import { SellerAccess } from '../../common/decorators/seller-access.decorator';
 import { Controller, Get, Post, Patch, Delete, Body, Param, Query, Inject, ParseFloatPipe } from '@nestjs/common';
 import { BranchScoped } from '../../common/decorators/branch-scoped.decorator';
 import { ApiTags, ApiOperation, ApiBearerAuth, ApiParam, ApiQuery } from '@nestjs/swagger';
@@ -43,6 +44,7 @@ export class CreditAccountController {
 
   @Get('client/:clientId/open')
   @ApiOperation({ summary: 'Cuentas abiertas de un cliente', description: 'Obtiene las cuentas de crédito pendientes o parciales de un cliente' })
+  @SellerAccess()
   async findOpenByClient(@Param('clientId') clientId: string) { return this.creditRepository.findOpenByClientId(clientId); }
 
   @Get('client/:clientId')

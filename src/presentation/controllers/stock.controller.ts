@@ -1,3 +1,4 @@
+import { SellerAccess } from '../../common/decorators/seller-access.decorator';
 import { Controller, Get, Post, Body, Param, Query } from '@nestjs/common';
 import { BranchScoped } from '../../common/decorators/branch-scoped.decorator';
 import { ApiTags, ApiOperation, ApiBearerAuth, ApiParam, ApiQuery } from '@nestjs/swagger';
@@ -29,10 +30,12 @@ export class StockController {
   @Get('company/:companyId')
   @ApiOperation({ summary: 'Stock por empresa', description: 'Obtiene el inventario paginado de una empresa especifica' })
   @ApiParam({ name: 'companyId', description: 'ID de la empresa' })
+  @SellerAccess()
   async findByCompany(@Param('companyId') companyId: string, @Query() pagination: PaginationDto) { return this.getStockByCompany.execute(companyId, pagination.page, pagination.limit); }
 
   @Get('availability/:productId')
   @ApiOperation({ summary: 'Consultar stock y precios de un producto en todas las sucursales' })
+  @SellerAccess()
   async availability(
     @Param() params: GetStockAvailabilityParamsDto,
     @Query() query: GetStockAvailabilityQueryDto,

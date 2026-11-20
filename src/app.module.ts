@@ -31,6 +31,7 @@ import { QuoteModule } from './modules/quote.module';
 import { JwtAuthGuard } from './presentation/guards/jwt-auth.guard';
 import { RolesGuard } from './presentation/guards/roles.guard';
 import { BranchAccessGuard } from './presentation/guards/branch-access.guard';
+import { SellerAccessGuard } from './presentation/guards/seller-access.guard';
 import { BranchModule } from './modules/branch.module';
 import { BillingModule } from './modules/billing.module';
 import { HttpExceptionFilter } from './presentation/filters/http-exception.filter';
@@ -51,6 +52,7 @@ import { BranchContextInterceptor } from './presentation/interceptors/branch-con
   ],
   providers: [
     { provide: APP_GUARD, useClass: JwtAuthGuard },
+    { provide: APP_GUARD, useClass: SellerAccessGuard },
     { provide: APP_GUARD, useClass: BranchAccessGuard },
     { provide: APP_GUARD, useClass: RolesGuard },
     { provide: APP_FILTER, useClass: HttpExceptionFilter },

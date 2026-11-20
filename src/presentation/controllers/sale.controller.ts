@@ -1,3 +1,4 @@
+import { SellerAccess } from '../../common/decorators/seller-access.decorator';
 import { Controller, Get, Post, Patch, Delete, Body, Query, Param } from '@nestjs/common';
 import { BranchScoped } from '../../common/decorators/branch-scoped.decorator';
 import { ApiTags, ApiOperation, ApiBearerAuth, ApiParam } from '@nestjs/swagger';
@@ -26,6 +27,7 @@ export class SaleController {
 
   @Post()
   @ApiOperation({ summary: 'Registrar venta', description: 'Crea una venta (mixta multi-empresa). Descuenta stock, registra en caja (efectivo) o crea credito (credito)' })
+  @SellerAccess()
   async create(
     @Body() dto: CreateSaleDto,
     @CurrentUser('id') userId: string,
@@ -36,11 +38,13 @@ export class SaleController {
 
   @Get()
   @ApiOperation({ summary: 'Listar ventas', description: 'Obtiene lista paginada de ventas con filtros opcionales' })
+  @SellerAccess()
   async findAll(@Query() filter: FilterSaleDto) { return this.getSales.execute(filter); }
 
   @Patch(':id/voucher')
   @ApiOperation({ summary: 'Actualizar comprobante', description: 'Cambia el tipo de comprobante de una venta' })
   @ApiParam({ name: 'id', description: 'ID de la venta' })
+  @SellerAccess()
   async updateVoucherType(@Param('id') id: string, @Body() dto: UpdateVoucherDto) {
     return this.updateVoucher.execute(id, dto.voucherType);
   }

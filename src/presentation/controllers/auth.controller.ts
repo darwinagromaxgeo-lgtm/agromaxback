@@ -1,3 +1,4 @@
+import { SellerAccess } from '../../common/decorators/seller-access.decorator';
 import { Controller, Post, Body, Get } from '@nestjs/common';
 import { ApiTags, ApiOperation, ApiBearerAuth } from '@nestjs/swagger';
 import { LoginUseCase } from '../../application/use-cases/auth/login.use-case';
@@ -32,5 +33,6 @@ export class AuthController {
   @ApiBearerAuth('JWT')
   @Get('me')
   @ApiOperation({ summary: 'Obtener usuario actual', description: 'Devuelve los datos del usuario autenticado' })
+  @SellerAccess()
   async me(@CurrentUser('id') userId: string) { return this.validateTokenUseCase.execute(userId); }
 }

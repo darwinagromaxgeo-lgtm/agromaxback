@@ -1,3 +1,4 @@
+import { SellerAccess } from '../../common/decorators/seller-access.decorator';
 import { Controller, Get, Post, Put, Delete, Body, Param } from '@nestjs/common';
 import { ApiTags, ApiOperation, ApiBearerAuth, ApiParam } from '@nestjs/swagger';
 import { CreateCompanyUseCase } from '../../application/use-cases/company/create-company.use-case';
@@ -24,6 +25,7 @@ export class CompanyController {
 
   @Get()
   @ApiOperation({ summary: 'Listar empresas', description: 'Obtiene todas las empresas registradas' })
+  @SellerAccess()
   async findAll() { return this.getCompanies.execute(); }
 
   @Put(':id')

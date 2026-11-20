@@ -1,3 +1,4 @@
+import { SellerAccess } from '../../common/decorators/seller-access.decorator';
 import { Controller, Get, Post, Put, Patch, Body, Param, Query } from '@nestjs/common';
 import { ApiTags, ApiOperation, ApiBearerAuth, ApiParam } from '@nestjs/swagger';
 import { Roles } from '../../common/decorators/roles.decorator';
@@ -59,6 +60,7 @@ export class UserController {
   @Patch(':id/password')
   @ApiOperation({ summary: 'Cambiar contrasena', description: 'Cambia la contrasena de un usuario. Self requiere currentPassword, admin puede resetear sin ella' })
   @ApiParam({ name: 'id', description: 'ID del usuario' })
+  @SellerAccess()
   async updatePassword(
     @Param('id') id: string,
     @Body() dto: ChangePasswordDto,

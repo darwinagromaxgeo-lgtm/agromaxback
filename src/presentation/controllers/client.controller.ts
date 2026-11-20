@@ -1,3 +1,4 @@
+import { SellerAccess } from '../../common/decorators/seller-access.decorator';
 import { Controller, Get, Post, Put, Body, Param, Query } from '@nestjs/common';
 import { ApiTags, ApiOperation, ApiBearerAuth, ApiParam } from '@nestjs/swagger';
 import { CreateClientUseCase } from '../../application/use-cases/client/create-client.use-case';
@@ -13,6 +14,7 @@ import { CurrentBranch } from '../../common/decorators/current-branch.decorator'
 @ApiBearerAuth('JWT')
 @Controller('clients')
 @BranchScoped()
+@SellerAccess()
 export class ClientController {
   constructor(
     private readonly createClient: CreateClientUseCase,
