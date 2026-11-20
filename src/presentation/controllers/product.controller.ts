@@ -13,6 +13,7 @@ import { CreateProductDto } from '../../application/dtos/product/create-product.
 import { UpdateProductDto } from '../../application/dtos/product/update-product.dto';
 import { FilterProductDto } from '../../application/dtos/product/filter-product.dto';
 import { CurrentUser } from '../../common/decorators/current-user.decorator';
+import { Roles } from '../../common/decorators/roles.decorator';
 
 @ApiTags('Products')
 @ApiBearerAuth('JWT')
@@ -29,6 +30,7 @@ export class ProductController {
   ) {}
 
   @Post()
+  @Roles('ADMIN')
   @ApiOperation({ summary: 'Crear producto', description: 'Registra un nuevo producto en el catalogo' })
   async create(@Body() dto: CreateProductDto, @CurrentUser('id') userId: string) { return this.createProduct.execute(dto, userId); }
 
@@ -44,16 +46,19 @@ export class ProductController {
   }
 
   @Put(':id')
+  @Roles('ADMIN')
   @ApiOperation({ summary: 'Actualizar producto', description: 'Modifica los datos de un producto existente' })
   @ApiParam({ name: 'id', description: 'ID del producto' })
   async update(@Param('id') id: string, @Body() dto: UpdateProductDto) { return this.updateProduct.execute(id, dto); }
 
   @Delete(':id')
+  @Roles('ADMIN')
   @ApiOperation({ summary: 'Eliminar producto', description: 'Elimina un producto permanentemente de la base de datos' })
   @ApiParam({ name: 'id', description: 'ID del producto' })
   async remove(@Param('id') id: string) { return this.deleteProduct.execute(id); }
 
   @Post('import')
+  @Roles('ADMIN')
   @ApiOperation({ summary: 'Importar productos desde Excel' })
   @UseInterceptors(FileInterceptor('file', { storage: memoryStorage(), limits: { fileSize: 10 * 1024 * 1024 } }))
   async importFromExcel(@UploadedFile() file: Express.Multer.File) {
@@ -62,6 +67,7 @@ export class ProductController {
   }
 
   @Post(':id/image')
+  @Roles('ADMIN')
   @ApiOperation({ summary: 'Subir imagen de producto' })
   @UseInterceptors(FileInterceptor('file', { storage: memoryStorage(), limits: { fileSize: 5 * 1024 * 1024 } }))
   async uploadImage(@Param('id') id: string, @UploadedFile() file: Express.Multer.File) {

@@ -1,12 +1,12 @@
-import { IsString, IsArray, ValidateNested, IsNumber, IsOptional, IsDateString, IsBoolean, ArrayMinSize, Min } from 'class-validator';
+import { IsString, IsArray, ValidateNested, IsNumber, IsOptional, IsDateString, IsBoolean, ArrayMinSize, Min, IsPositive } from 'class-validator';
 import { Type } from 'class-transformer';
 
 export class SaleItemDto {
   @IsString() productId: string;
   @IsString() companyId: string;
-  @IsNumber() quantity: number;
+  @IsNumber() @IsPositive() quantity: number;
   @IsString() priceTier: string;
-  @IsNumber() unitPrice: number;
+  @IsNumber() @Min(0) unitPrice: number;
   @IsOptional() @IsString() lotId?: string;
 }
 

@@ -39,6 +39,7 @@ export class PurchaseController {
   ) {}
 
   @Post()
+  @Roles('ADMIN')
   @ApiOperation({ summary: 'Registrar compra' })
   async create(
     @Body() dto: CreatePurchaseDto,
@@ -79,6 +80,7 @@ export class PurchaseController {
   }
 
   @Patch(':id/items')
+  @Roles('ADMIN')
   @ApiOperation({ summary: 'Editar o agregar productos a una compra existente' })
   async editItems(
     @Param('id') id: string,

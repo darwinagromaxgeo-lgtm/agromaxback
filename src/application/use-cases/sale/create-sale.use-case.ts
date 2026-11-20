@@ -1,9 +1,11 @@
-import { Injectable, Inject, BadRequestException } from '@nestjs/common';
+import { Injectable, Inject, BadRequestException, ForbiddenException } from '@nestjs/common';
 import { ISaleRepository, SALE_REPOSITORY } from '../../../domain/repositories/sale.repository';
 import { IStockRepository, STOCK_REPOSITORY } from '../../../domain/repositories/stock.repository';
 import { IProductRepository, PRODUCT_REPOSITORY } from '../../../domain/repositories/product.repository';
 import { IProductLotRepository, PRODUCT_LOT_REPOSITORY } from '../../../domain/repositories/product-lot.repository';
 import { IPaymentMethodRepository, PAYMENT_METHOD_REPOSITORY } from '../../../domain/repositories/payment-method.repository';
+import { IUserRepository, USER_REPOSITORY } from '../../../domain/repositories/user.repository';
+import { assertConfiguredSalePrice } from '../../services/sale-price-permissions';
 import { CashRegisterEntryType, CashRegisterEntryCategory, StockMovementType } from '../../../domain/enums';
 import { CreateSaleDto } from '../../dtos/sale/create-sale.dto';
 import { getNowInTimezone } from '../../../shared/utils/date.util';
@@ -40,6 +42,7 @@ export class CreateSaleUseCase {
     private readonly recordStockMovement: RecordStockMovementUseCase,
     private readonly registerCreditPayment: RegisterPaymentUseCase,
     @InjectConnection() private readonly connection: Connection,
+    @Inject(USER_REPOSITORY) private readonly users: IUserRepository,
   ) {}
 
   async execute(dto: CreateSaleDto, userId?: string, branchId?: string) {
@@ -108,6 +111,12 @@ export class CreateSaleUseCase {
         );
       }
       stockSnapshots.set(`${item.productId}:${item.companyId}`, available);
+    }
+
+    const actor = userId ? await this.users.findById(userId) : null;
+    if (!actor || !actor.isActive) throw new ForbiddenException('Usuario no disponible para registrar la venta');
+    if (actor.role !== 'ADMIN') {
+      for (const item of dto.items) assertConfiguredSalePrice(productSnapshots.get(item.productId)!, item, branchId);
     }
 
     const items = dto.items.map((item) => ({

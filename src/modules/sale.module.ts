@@ -17,9 +17,10 @@ import { PaymentMethodModule } from './payment-method.module';
 import { ProductLotModule } from './product-lot.module';
 import { ClientModule } from './client.module';
 import { BillingPersistenceModule } from './billing-persistence.module';
+import { UserModule } from './user.module';
 
 @Module({
-  imports: [MongooseModule.forFeature([{ name: SaleDocument.name, schema: SaleSchema }]), StockModule, forwardRef(() => CashRegisterModule), CreditAccountModule, ProductModule, StockMovementModule, PaymentMethodModule, ProductLotModule, ClientModule, BillingPersistenceModule],
+  imports: [MongooseModule.forFeature([{ name: SaleDocument.name, schema: SaleSchema }]), StockModule, forwardRef(() => CashRegisterModule), CreditAccountModule, ProductModule, StockMovementModule, PaymentMethodModule, ProductLotModule, ClientModule, BillingPersistenceModule, UserModule],
   controllers: [SaleController],
   providers: [{ provide: SALE_REPOSITORY, useClass: MongoSaleRepository }, CreateSaleUseCase, GetSalesUseCase, CancelSaleUseCase, UpdateVoucherUseCase],
   exports: [SALE_REPOSITORY, CreateSaleUseCase],
