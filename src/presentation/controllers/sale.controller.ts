@@ -1,3 +1,4 @@
+import { AccountingRead } from '../../common/decorators/accounting-access.decorator';
 import { SellerAccess } from '../../common/decorators/seller-access.decorator';
 import { Controller, Get, Post, Patch, Delete, Body, Query, Param } from '@nestjs/common';
 import { BranchScoped } from '../../common/decorators/branch-scoped.decorator';
@@ -15,6 +16,7 @@ import { CurrentBranch } from '../../common/decorators/current-branch.decorator'
 
 @ApiTags('Sales')
 @ApiBearerAuth('JWT')
+@AccountingRead()
 @Controller('sales')
 @BranchScoped()
 export class SaleController {

@@ -1,3 +1,4 @@
+import { AccountingRead } from '../../common/decorators/accounting-access.decorator';
 import { SellerAccess } from '../../common/decorators/seller-access.decorator';
 import { Controller, Post, Body, Get } from '@nestjs/common';
 import { ApiTags, ApiOperation, ApiBearerAuth } from '@nestjs/swagger';
@@ -31,6 +32,7 @@ export class AuthController {
   async register(@Body() dto: RegisterDto) { return this.registerUseCase.execute(dto.username, dto.password, dto.fullName, dto.role, dto.email); }
 
   @ApiBearerAuth('JWT')
+  @AccountingRead()
   @Get('me')
   @ApiOperation({ summary: 'Obtener usuario actual', description: 'Devuelve los datos del usuario autenticado' })
   @SellerAccess()

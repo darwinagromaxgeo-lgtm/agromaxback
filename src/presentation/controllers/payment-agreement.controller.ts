@@ -1,3 +1,4 @@
+import { AccountingRead } from '../../common/decorators/accounting-access.decorator';
 import { Controller, Get, Post, Patch, Body, Param, Query, UploadedFile, UseInterceptors, BadRequestException, Inject } from '@nestjs/common';
 import { FileInterceptor } from '@nestjs/platform-express';
 import { memoryStorage } from 'multer';
@@ -16,6 +17,7 @@ import { CurrentUser } from '../../common/decorators/current-user.decorator';
 
 @ApiTags('Payment Agreements')
 @ApiBearerAuth('JWT')
+@AccountingRead()
 @Controller('payment-agreements')
 export class PaymentAgreementController {
   constructor(

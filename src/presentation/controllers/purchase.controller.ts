@@ -1,3 +1,4 @@
+import { AccountingRead } from '../../common/decorators/accounting-access.decorator';
 import { Controller, Delete, Get, Post, Patch, Body, Query, Param } from '@nestjs/common';
 import { BranchScoped } from '../../common/decorators/branch-scoped.decorator';
 import { ApiTags, ApiOperation, ApiBearerAuth } from '@nestjs/swagger';
@@ -23,6 +24,7 @@ import { CurrentBranch } from '../../common/decorators/current-branch.decorator'
 
 @ApiTags('Purchases')
 @ApiBearerAuth('JWT')
+@AccountingRead()
 @Controller('purchases')
 @BranchScoped()
 export class PurchaseController {

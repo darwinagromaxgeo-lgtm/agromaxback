@@ -1,3 +1,4 @@
+import { AccountingRead } from '../../common/decorators/accounting-access.decorator';
 import { Controller, Get, Query } from '@nestjs/common';
 import { BranchScoped } from '../../common/decorators/branch-scoped.decorator';
 import { ApiTags, ApiOperation, ApiBearerAuth } from '@nestjs/swagger';
@@ -6,6 +7,7 @@ import { FilterStockMovementDto } from '../../application/dtos/stock-movement/fi
 
 @ApiTags('Kardex')
 @ApiBearerAuth('JWT')
+@AccountingRead()
 @Controller('stock-movements')
 @BranchScoped()
 export class StockMovementController {

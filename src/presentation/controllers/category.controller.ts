@@ -1,3 +1,4 @@
+import { AccountingRead } from '../../common/decorators/accounting-access.decorator';
 import { SellerAccess } from '../../common/decorators/seller-access.decorator';
 import { Controller, Get, Post, Put, Delete, Body, Param } from '@nestjs/common';
 import { ApiTags, ApiOperation, ApiBearerAuth, ApiParam } from '@nestjs/swagger';
@@ -10,6 +11,7 @@ import { UpdateCategoryDto } from '../../application/dtos/category/update-catego
 
 @ApiTags('Categories')
 @ApiBearerAuth('JWT')
+@AccountingRead()
 @Controller('categories')
 export class CategoryController {
   constructor(

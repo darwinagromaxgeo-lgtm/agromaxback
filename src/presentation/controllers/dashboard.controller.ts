@@ -1,3 +1,4 @@
+import { AccountingRead } from '../../common/decorators/accounting-access.decorator';
 import { Controller, Get, Query } from '@nestjs/common';
 import { BranchScoped } from '../../common/decorators/branch-scoped.decorator';
 import { ApiTags, ApiOperation, ApiBearerAuth, ApiQuery } from '@nestjs/swagger';
@@ -17,6 +18,7 @@ import { GetSubcategoryPurchaseChartUseCase } from '../../application/use-cases/
 
 @ApiTags('Dashboard')
 @ApiBearerAuth('JWT')
+@AccountingRead()
 @Controller('dashboard')
 @BranchScoped()
 export class DashboardController {

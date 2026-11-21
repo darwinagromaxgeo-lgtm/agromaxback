@@ -1,3 +1,4 @@
+import { AccountingRead } from '../../common/decorators/accounting-access.decorator';
 import { SellerAccess } from '../../common/decorators/seller-access.decorator';
 import { Controller, Get, Post, Patch, Query, Body, Param } from '@nestjs/common';
 import { BranchScoped } from '../../common/decorators/branch-scoped.decorator';
@@ -10,6 +11,7 @@ import { UpdateProductLotDto } from '../../application/dtos/product-lot/update-p
 
 @ApiTags('ProductLots')
 @ApiBearerAuth('JWT')
+@AccountingRead()
 @Controller('product-lots')
 @BranchScoped()
 export class ProductLotController {

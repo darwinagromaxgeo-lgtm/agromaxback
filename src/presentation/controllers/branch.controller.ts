@@ -1,3 +1,4 @@
+import { AccountingRead } from '../../common/decorators/accounting-access.decorator';
 import { SellerAccess } from '../../common/decorators/seller-access.decorator';
 import { Body, Controller, Get, Param, Patch, Post, Put } from '@nestjs/common';
 import { ApiBearerAuth, ApiOperation, ApiTags } from '@nestjs/swagger';
@@ -13,6 +14,7 @@ import { Roles } from '../../common/decorators/roles.decorator';
 export class BranchController {
   constructor(private readonly manageBranches: ManageBranchesUseCase) {}
 
+  @AccountingRead()
   @Get('accessible')
   @ApiOperation({ summary: 'Listar sucursales disponibles para el usuario actual' })
   @SellerAccess()

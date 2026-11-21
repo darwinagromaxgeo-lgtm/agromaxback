@@ -1,3 +1,4 @@
+import { AccountingOwnPassword } from '../../common/decorators/accounting-access.decorator';
 import { SellerAccess } from '../../common/decorators/seller-access.decorator';
 import { Controller, Get, Post, Put, Patch, Body, Param, Query } from '@nestjs/common';
 import { ApiTags, ApiOperation, ApiBearerAuth, ApiParam } from '@nestjs/swagger';
@@ -57,6 +58,7 @@ export class UserController {
     return this.updateUser.execute(id, dto);
   }
 
+  @AccountingOwnPassword()
   @Patch(':id/password')
   @ApiOperation({ summary: 'Cambiar contrasena', description: 'Cambia la contrasena de un usuario. Self requiere currentPassword, admin puede resetear sin ella' })
   @ApiParam({ name: 'id', description: 'ID del usuario' })

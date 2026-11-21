@@ -1,3 +1,4 @@
+import { AccountingRead } from '../../common/decorators/accounting-access.decorator';
 import { Body, Controller, Get, Param, Post, Query, Res, StreamableFile } from '@nestjs/common';
 import { ApiBearerAuth, ApiTags } from '@nestjs/swagger';
 import { Response } from 'express';
@@ -11,7 +12,8 @@ import { CreateCreditNoteDto, FilterCreditNotesDto, PreviewCreditNoteDto } from 
 import { BillingDocumentIdDto, BillingFileParamsDto, IssueBillingDocumentDto } from '../../application/dtos/billing/billing-action.dto';
 import { DiscardBillingDraftDto } from '../../application/dtos/billing/discard-billing-draft.dto';
 
-@ApiTags('Credit notes') @ApiBearerAuth('JWT') @BranchScoped() @Roles('ADMIN','VENDEDOR')
+@ApiTags('Credit notes') @ApiBearerAuth('JWT') @BranchScoped() @Roles('ADMIN','VENDEDOR','CONTABILIDAD')
+@AccountingRead()
 @Controller('billing/credit-notes')
 export class BillingCreditNoteController {
   constructor(private readonly notes:BillingCreditNoteService) {}

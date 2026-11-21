@@ -1,3 +1,4 @@
+import { AccountingRead } from '../../common/decorators/accounting-access.decorator';
 import { Controller, Get, Post, Patch, Delete, Body, Param, Query, Inject, BadRequestException } from '@nestjs/common';
 import { BranchScoped } from '../../common/decorators/branch-scoped.decorator';
 import { ApiTags, ApiOperation, ApiBearerAuth, ApiParam, ApiQuery } from '@nestjs/swagger';
@@ -22,6 +23,7 @@ import { getTodayDateString } from '../../shared/utils/date.util';
 
 @ApiTags('Cash Register')
 @ApiBearerAuth('JWT')
+@AccountingRead()
 @Controller('cash-registers')
 @BranchScoped()
 export class CashRegisterController {

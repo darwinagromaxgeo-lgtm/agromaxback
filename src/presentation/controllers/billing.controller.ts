@@ -1,3 +1,4 @@
+import { AccountingRead } from '../../common/decorators/accounting-access.decorator';
 import { SellerAccess } from '../../common/decorators/seller-access.decorator';
 import { Body, Controller, Get, Param, Post, Query, Res, StreamableFile } from '@nestjs/common';
 import { ApiBearerAuth, ApiOperation, ApiTags } from '@nestjs/swagger';
@@ -17,7 +18,8 @@ import { UpdateBillingReceiverDto } from '../../application/dtos/billing/billing
 @ApiTags('Billing')
 @ApiBearerAuth('JWT')
 @BranchScoped()
-@Roles('ADMIN', 'VENDEDOR')
+@Roles('ADMIN', 'VENDEDOR', 'CONTABILIDAD')
+@AccountingRead()
 @Controller('billing')
 @SellerAccess()
 export class BillingController {

@@ -1,3 +1,4 @@
+import { AccountingRead } from '../../common/decorators/accounting-access.decorator';
 import { Controller, Get, Post, Body, Query } from '@nestjs/common';
 import { BranchScoped } from '../../common/decorators/branch-scoped.decorator';
 import { ApiTags, ApiOperation, ApiBearerAuth } from '@nestjs/swagger';
@@ -11,6 +12,7 @@ import { CreateStockAdjustmentBatchDto } from '../../application/dtos/stock-adju
 
 @ApiTags('Stock Adjustments')
 @ApiBearerAuth('JWT')
+@AccountingRead()
 @Controller('stock-adjustments')
 @BranchScoped()
 export class StockAdjustmentController {

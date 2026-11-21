@@ -1,3 +1,4 @@
+import { AccountingRead } from '../../common/decorators/accounting-access.decorator';
 import { Controller, Get, Post, Body, Param, Query, UploadedFile, UseInterceptors, BadRequestException, Inject } from '@nestjs/common';
 import { BranchScoped } from '../../common/decorators/branch-scoped.decorator';
 import { FileInterceptor } from '@nestjs/platform-express';
@@ -15,6 +16,7 @@ import { IAccountPayableRepository, ACCOUNT_PAYABLE_REPOSITORY } from '../../dom
 
 @ApiTags('Accounts Payable')
 @ApiBearerAuth('JWT')
+@AccountingRead()
 @Controller('accounts-payable')
 @BranchScoped()
 export class AccountPayableController {

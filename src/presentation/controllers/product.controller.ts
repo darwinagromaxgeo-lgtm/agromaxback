@@ -1,3 +1,4 @@
+import { AccountingRead } from '../../common/decorators/accounting-access.decorator';
 import { SellerAccess } from '../../common/decorators/seller-access.decorator';
 import { Controller, Get, Post, Put, Delete, Body, Param, Query, UploadedFile, UseInterceptors, BadRequestException } from '@nestjs/common';
 import { FileInterceptor } from '@nestjs/platform-express';
@@ -18,6 +19,7 @@ import { Roles } from '../../common/decorators/roles.decorator';
 
 @ApiTags('Products')
 @ApiBearerAuth('JWT')
+@AccountingRead()
 @Controller('products')
 export class ProductController {
   constructor(

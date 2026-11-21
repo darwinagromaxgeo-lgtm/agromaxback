@@ -1,3 +1,4 @@
+import { AccountingRead } from '../../common/decorators/accounting-access.decorator';
 import { SellerAccess } from '../../common/decorators/seller-access.decorator';
 import { Controller, Get, Post, Put, Delete, Body, Param } from '@nestjs/common';
 import { ApiTags, ApiOperation, ApiBearerAuth, ApiParam } from '@nestjs/swagger';
@@ -10,6 +11,7 @@ import { UpdateUnitDto } from '../../application/dtos/unit/update-unit.dto';
 
 @ApiTags('Units')
 @ApiBearerAuth('JWT')
+@AccountingRead()
 @Controller('units')
 export class UnitController {
   constructor(

@@ -1,3 +1,4 @@
+import { AccountingRead } from '../../common/decorators/accounting-access.decorator';
 import { SellerAccess } from '../../common/decorators/seller-access.decorator';
 import { Controller, Get, Post, Patch, Body, Param } from '@nestjs/common';
 import { ApiTags, ApiOperation, ApiBearerAuth, ApiParam } from '@nestjs/swagger';
@@ -6,6 +7,7 @@ import { CreatePaymentMethodDto, UpdatePaymentMethodDto } from '../../applicatio
 
 @ApiTags('Payment Methods')
 @ApiBearerAuth('JWT')
+@AccountingRead()
 @Controller('payment-methods')
 export class PaymentMethodController {
   constructor(

@@ -1,3 +1,4 @@
+import { AccountingRead } from '../../common/decorators/accounting-access.decorator';
 import { SellerAccess } from '../../common/decorators/seller-access.decorator';
 import { Controller, Get, Post, Put, Body, Param, Query } from '@nestjs/common';
 import { ApiTags, ApiOperation, ApiBearerAuth, ApiParam, ApiQuery } from '@nestjs/swagger';
@@ -10,6 +11,7 @@ import { Roles } from '../../common/decorators/roles.decorator';
 
 @ApiTags('Price Tiers')
 @ApiBearerAuth('JWT')
+@AccountingRead()
 @Controller('price-tiers')
 export class PriceTierController {
   constructor(

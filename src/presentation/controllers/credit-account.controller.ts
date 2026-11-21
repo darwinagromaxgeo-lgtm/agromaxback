@@ -1,3 +1,4 @@
+import { AccountingRead } from '../../common/decorators/accounting-access.decorator';
 import { SellerAccess } from '../../common/decorators/seller-access.decorator';
 import { Controller, Get, Post, Patch, Delete, Body, Param, Query, Inject, ParseFloatPipe } from '@nestjs/common';
 import { BranchScoped } from '../../common/decorators/branch-scoped.decorator';
@@ -24,6 +25,7 @@ import { ICreditAccountRepository, CREDIT_ACCOUNT_REPOSITORY } from '../../domai
 
 @ApiTags('Credits')
 @ApiBearerAuth('JWT')
+@AccountingRead()
 @Controller('credits')
 @BranchScoped()
 export class CreditAccountController {

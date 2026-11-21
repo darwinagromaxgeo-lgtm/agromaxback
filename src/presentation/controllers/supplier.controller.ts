@@ -1,3 +1,4 @@
+import { AccountingRead } from '../../common/decorators/accounting-access.decorator';
 import { Controller, Get, Post, Body, Param, Query } from '@nestjs/common';
 import { ApiTags, ApiOperation, ApiBearerAuth, ApiParam } from '@nestjs/swagger';
 import { CreateSupplierUseCase } from '../../application/use-cases/supplier/create-supplier.use-case';
@@ -8,6 +9,7 @@ import { PaginationDto } from '../../application/dtos/common/pagination.dto';
 
 @ApiTags('Suppliers')
 @ApiBearerAuth('JWT')
+@AccountingRead()
 @Controller('suppliers')
 export class SupplierController {
   constructor(

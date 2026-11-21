@@ -1,3 +1,4 @@
+import { AccountingRead } from '../../common/decorators/accounting-access.decorator';
 import { SellerAccess } from '../../common/decorators/seller-access.decorator';
 import { Controller, Get, Post, Put, Delete, Body, Param } from '@nestjs/common';
 import { ApiTags, ApiOperation, ApiBearerAuth, ApiParam } from '@nestjs/swagger';
@@ -10,6 +11,7 @@ import { UpdateCompanyDto } from '../../application/dtos/company/update-company.
 
 @ApiTags('Companies')
 @ApiBearerAuth('JWT')
+@AccountingRead()
 @Controller('companies')
 export class CompanyController {
   constructor(
