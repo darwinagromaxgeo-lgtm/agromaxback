@@ -11,6 +11,7 @@ export interface ActiveIngredientItem {
 }
 
 export interface ProductCatalogImport {
+  previousNames?: string[];
   deduplication?: {
     canonicalProductId: string;
     canonicalSku?: string;

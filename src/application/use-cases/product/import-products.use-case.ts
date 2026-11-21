@@ -96,7 +96,7 @@ export class ImportProductsUseCase {
 
         const existing = await this.productRepo.findByName(name);
         if (existing) {
-          await this.productRepo.update(existing.id!, productData);
+          await this.productRepo.update(existing.id!, { ...productData, name: existing.name });
           result.updated++;
         } else {
           await this.productRepo.create({

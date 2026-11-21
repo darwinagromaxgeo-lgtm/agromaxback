@@ -37,7 +37,7 @@ export class MongoProductRepository implements IProductRepository {
     page = 1,
     limit = 20,
   ): Promise<{ data: ProductEntity[]; total: number }> {
-    const query: any = {};
+    const query: any = { 'catalogImport.deduplication.inventoryConsolidated': { $ne: true } };
     if (filter?.search) query.name = { $regex: filter.search, $options: 'i' };
     if (filter?.category) query.$expr = { $eq: [{ $toString: '$category' }, filter.category] };
     if (filter?.activeIngredient) {
@@ -74,7 +74,11 @@ export class MongoProductRepository implements IProductRepository {
 
   async findByName(name: string): Promise<ProductEntity | null> {
     const literalName = name.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-    const doc = await this.productModel.findOne({ name: { $regex: `^${literalName}$`, $options: 'i' } }).lean().exec();
+    const match = { $regex: `^${literalName}$`, $options: 'i' };
+    const doc = await this.productModel.findOne({
+      'catalogImport.deduplication.inventoryConsolidated': { $ne: true },
+      $or: [{ name: match }, { 'catalogImport.previousNames': match }],
+    }).lean().exec();
     return doc ? this.toEntity(doc) : null;
   }
 

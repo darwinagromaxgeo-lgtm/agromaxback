@@ -22,7 +22,7 @@ test('el catálogo conserva los pendientes y exige precio de la sucursal, unidad
 
 test('editar nombre o imagen no habilita venta; completar datos sí, y quitar un precio vuelve a bloquear', async () => {
   let product = pending();
-  const useCase = new UpdateProductUseCase({ findById: async () => structuredClone(product), update: async (_, change) => (product = { ...product, ...change }) });
+  const useCase = new UpdateProductUseCase({ findById: async () => structuredClone(product), findByName: async () => null, update: async (_, change) => (product = { ...product, ...change }) });
   await useCase.execute('product', { name: 'Nombre revisado' });
   assert.equal(product.catalogStatus, 'PENDING_REVIEW');
   await useCase.execute('product', { categoryId: 'fertilizantes', unit: 'Saco', taxType: 'GRAVADO', prices: [{ priceTierId: 'minorista', price: 20 }] });
