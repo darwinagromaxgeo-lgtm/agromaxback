@@ -82,6 +82,11 @@ test('accepted fiscal cancellation unlocks exactly one replacement without chang
     await connection.collection('stocks').insertOne({product:ids.product,branch:branchId,quantity:5});
     await connection.collection('cash_registers').insertOne({sale:saleId,amount:3});
     const before={sale:await connection.collection('sales').findOne({}),stock:await connection.collection('stocks').findOne({}),cash:await connection.collection('cash_registers').findOne({})};
+    await originals.updateOne({_id:id},{$set:{activeSlot:false}});
+    assert.equal(await documents.hasSubmittedSale(saleId),true,'An inactive slot alone does not prove fiscal cancellation');
+    await originals.updateOne({_id:id},{$set:{activeSlot:true,cancelledByCreditNote:ids.foreign}});
+    assert.equal(await documents.hasSubmittedSale(saleId),true,'A cancellation reference alone does not release an active fiscal slot');
+    await originals.updateOne({_id:id},{$unset:{cancelledByCreditNote:1}});
     assert.equal(await documents.reserveNumber(source.issuer.documentNumber,'FAG1','beta',10),10);
     let submissions=0,queries=0;
     const provider={getStatus:async()=>({ready:true,environment:'beta',issuerRuc:source.issuer.documentNumber,supportedDocumentTypes:['FACTURA','BOLETA'],series:{FACTURA:'FAG1',BOLETA:'BAG1'},boletaSubmissionMode:'individual',creditNotes:{ready:true,cancellationReady:true,series:{FACTURA:'FNC1',BOLETA:'BNC1'}}}),getCreditNoteNumberingStart:()=>1,getNumberingStart:()=>1,submitCreditNote:async()=>{submissions++;return submissions===1?{status:'UNKNOWN',sunatDescription:'Timeout'}:{status:'ACCEPTED',sunatCode:'0',sunatDescription:'Accepted cancellation',cdrBase64:Buffer.from('PKcdr').toString('base64')};},checkCreditNoteStatus:async()=>{queries++;return queries===1?{status:'PENDING',ticket:'fixture-ticket',sunatDescription:'Pending'}:{status:'ACCEPTED',sunatCode:'0',sunatDescription:'Accepted cancellation',cdrBase64:Buffer.from('PKcdr').toString('base64')};},submit:async()=>({status:'ACCEPTED',sunatCode:'0',sunatDescription:'New receipt',cdrBase64:Buffer.from('PKcdr').toString('base64')})};
@@ -94,9 +99,11 @@ test('accepted fiscal cancellation unlocks exactly one replacement without chang
     const reissue={saleId,companyId,taxType:'GRAVADO',documentType:'BOLETA',receiver:{name:'CONSUMIDOR FINAL',documentType:'UNIDENTIFIED'},replacesDocumentId:id};
     await assert.rejects(()=>billing.preview(reissue,branch),/debe aceptarse/);
     assert.equal((await service.issue(cancellation.id,branch,ids.user)).status,'UNKNOWN');
+    assert.equal(await documents.hasSubmittedSale(saleId),true,'An uncertain cancellation must still block operational cancellation');
     assert.equal((await sales.findById(saleId).lean()).voucherType,'FACTURA');
     await assert.rejects(()=>billing.preview(reissue,branch),/debe aceptarse/);
     assert.equal((await service.checkStatus(cancellation.id,branchId)).status,'PENDING');
+    assert.equal(await documents.hasSubmittedSale(saleId),true,'A pending cancellation must still block operational cancellation');
     assert.equal((await sales.findById(saleId).lean()).voucherType,'FACTURA');
     assert.equal((await originals.findById(id).lean()).activeSlot,true);
     await assert.rejects(()=>billing.preview(reissue,branch),/debe aceptarse/);
@@ -107,7 +114,7 @@ test('accepted fiscal cancellation unlocks exactly one replacement without chang
     assert.equal((await sales.findById(saleId).lean()).voucherType,'NONE','The accepted cancellation automatically restores the internal sales note');
     const cancelled=await documents.findById(id,branchId);assert.equal(cancelled.cancelledByCreditNoteId,cancellation.id);assert.equal(cancelled.status,'ACCEPTED');
     assert.equal((await originals.findById(id).lean()).activeSlot,false);assert.equal(await documents.findForSale(saleId,companyId,'GRAVADO',branchId),null);
-    assert.equal(await documents.hasSubmittedSale(saleId),true,'Operational cancellation must remain blocked');
+    assert.equal(await documents.hasSubmittedSale(saleId),false,'An accepted full fiscal cancellation permits explicitly cancelling the sale');
     await assert.rejects(()=>billing.createDraft({...reissue,replacesDocumentId:undefined},branch,ids.user),/Volver a emitir/);
     const preview=await billing.preview(reissue,branch);assert.deepEqual(preview.items,source.items);assert.equal(preview.total,3);assert.equal(preview.receiver.documentType,'UNIDENTIFIED');assert.equal(preview.hasCdr,undefined);assert.equal(preview.number,undefined);
     const attempts=await Promise.allSettled([billing.createDraft(reissue,branch,ids.user),billing.createDraft(reissue,branch,ids.user)]);
@@ -120,6 +127,7 @@ test('accepted fiscal cancellation unlocks exactly one replacement without chang
     replacement=await billing.createDraft(reissue,branch,ids.user);assert.notEqual(replacement.id,discardedId);
     assert.equal((await documents.findById(id,branchId)).replacementDocumentId,replacement.id);
     const issued=await billing.issue(replacement.id,branch,ids.user);assert.equal(issued.status,'ACCEPTED');assert.equal(issued.series,'BAG1');assert.equal(issued.number,1);
+    assert.equal(await documents.hasSubmittedSale(saleId),true,'An accepted replacement blocks operational cancellation again');
     assert.equal((await sales.findById(saleId).lean()).voucherType,'BOLETA','An accepted replacement restores its fiscal type');
     const secondCancellation=await service.create({...request,originalDocumentId:issued.id,requestId:randomUUID()},branch,ids.user);
     assert.equal((await service.issue(secondCancellation.id,branch,ids.user)).status,'ACCEPTED');

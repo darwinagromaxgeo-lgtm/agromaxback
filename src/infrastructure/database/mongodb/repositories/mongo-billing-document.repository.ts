@@ -54,7 +54,13 @@ export class MongoBillingDocumentRepository implements IBillingDocumentRepositor
   }
 
   async hasSubmittedSale(saleId: string) {
-    return !!await this.model.exists({ sale: saleId, status: { $in: ['SENDING', 'PENDING', 'ACCEPTED', 'UNKNOWN'] } });
+    return !!await this.model.exists({
+      sale: saleId,
+      status: { $in: ['SENDING', 'PENDING', 'ACCEPTED', 'UNKNOWN'] },
+      // Only an accepted full cancellation releases the original fiscal slot.
+      // Its ACCEPTED status remains unchanged to preserve the original CDR.
+      $nor: [{ status: 'ACCEPTED', activeSlot: false, cancelledByCreditNote: { $type: 'objectId' } }],
+    });
   }
 
   async hasActiveSale(saleId: string) {
