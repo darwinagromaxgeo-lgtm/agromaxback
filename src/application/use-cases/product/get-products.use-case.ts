@@ -8,7 +8,7 @@ export class GetProductsUseCase {
 
   async execute(filter: FilterProductDto) {
     return this.productRepository.findAll(
-      { search: filter.search, category: filter.category, activeIngredient: filter.activeIngredient, control: filter.control, isActive: filter.isActive, sellableOnly: filter.sellableOnly, supplier: filter.supplier, unit: filter.unit, sort: filter.sort },
+      { search: filter.search, category: filter.category, activeIngredient: filter.activeIngredient, control: filter.control, isActive: filter.isActive, billingEnabled: filter.billingEnabled, sellableOnly: filter.sellableOnly, supplier: filter.supplier, unit: filter.unit, sort: filter.sort },
       filter.page, filter.limit,
     );
   }

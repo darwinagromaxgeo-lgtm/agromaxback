@@ -58,6 +58,9 @@ export class ProductDocument {
   @Prop({ default: 'GRAVADO' })
   taxType: string;
 
+  @Prop({ default: true })
+  billingEnabled: boolean;
+
   @Prop({ enum: ['READY', 'PENDING_REVIEW'], default: 'READY' })
   catalogStatus?: string;
 

@@ -1,9 +1,11 @@
-import { IsString, IsOptional, IsArray, ValidateNested, IsBoolean, IsIn } from 'class-validator';
-import { Type } from 'class-transformer';
+import { IsString, IsOptional, IsArray, ValidateNested, IsBoolean, IsIn, ValidateIf } from 'class-validator';
+import { Type, Transform } from 'class-transformer';
 import { ProductPriceDto, ActiveIngredientItemDto } from './create-product.dto';
 import { IgvTaxType } from '../../../domain/enums';
 
 export class UpdateProductDto {
+  @Transform(({ obj, key }) => obj[key])
+  @ValidateIf((_, value) => value !== undefined) @IsBoolean() billingEnabled?: boolean;
   @IsOptional() @IsString() name?: string;
   @IsOptional() @IsString() description?: string;
   @IsOptional() @IsString() categoryId?: string;

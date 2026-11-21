@@ -22,6 +22,7 @@ export class CreateProductUseCase {
       unit: dto.unit, activeIngredient: dto.activeIngredient,
       activeIngredients: dto.activeIngredients || [],
       taxType: dto.taxType || 'GRAVADO',
+      billingEnabled: dto.billingEnabled ?? true,
       catalogStatus: dto.taxType === 'PENDIENTE' ? 'PENDING_REVIEW' : 'READY',
       prices: dto.prices || [], tracksLot: dto.tracksLot ?? false,
       location: dto.location, isActive: true,

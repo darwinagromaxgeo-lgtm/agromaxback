@@ -6,6 +6,7 @@ import { IProductLotRepository, PRODUCT_LOT_REPOSITORY } from '../../../domain/r
 import { IPaymentMethodRepository, PAYMENT_METHOD_REPOSITORY } from '../../../domain/repositories/payment-method.repository';
 import { IUserRepository, USER_REPOSITORY } from '../../../domain/repositories/user.repository';
 import { assertConfiguredSalePrice } from '../../services/sale-price-permissions';
+import { assertProductAllowsBilling } from '../../services/product-billing-eligibility';
 import { CashRegisterEntryType, CashRegisterEntryCategory, StockMovementType } from '../../../domain/enums';
 import { CreateSaleDto } from '../../dtos/sale/create-sale.dto';
 import { getNowInTimezone } from '../../../shared/utils/date.util';
@@ -93,6 +94,7 @@ export class CreateSaleUseCase {
       const product = await this.productRepository.findById(item.productId);
       if (!product) throw new BadRequestException('Producto no encontrado');
       if (product.isActive === false) throw new BadRequestException(`El producto "${product.name}" está desactivado`);
+      if (dto.voucherType && dto.voucherType !== 'NONE') assertProductAllowsBilling(product);
       if (product.catalogStatus === 'PENDING_REVIEW' || product.taxType === 'PENDIENTE') {
         throw new BadRequestException(`Completa el precio, la unidad y el IGV del producto "${product.name}" antes de venderlo`);
       }

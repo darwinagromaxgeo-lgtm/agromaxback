@@ -264,7 +264,7 @@ test('sale cancellation, linked cash deletion and credit deletion stop before si
 test('sales preserve the voucher type once a fiscal document is associated', async () => {
   const { UpdateVoucherUseCase } = require('../dist/application/use-cases/sale/update-voucher.use-case');
   let writes = 0;
-  const sale = { id: ids.sale, voucherType: 'BOLETA', isCancelled: false };
+  const sale = { id: ids.sale, voucherType: 'BOLETA', isCancelled: false, items: [] };
   const repository = { findById: async () => sale, update: async () => { writes++; return sale; } };
   const useCase = new UpdateVoucherUseCase(repository, { hasActiveSale: async () => true });
   await assert.rejects(useCase.execute(ids.sale, 'FACTURA'), /comprobante asociado/);
@@ -536,4 +536,56 @@ test('HTTP rejects receiver edits after issuance and requires a complete nested 
   const updated = await http.post(`/billing/documents/${id}/receiver`, { expectedRevision: 0, receiver }, { headers });
   assert.equal(updated.status, 201); assert.equal(updated.data.data.receiverRevision, 1);
   assert.equal((await http.post(`/billing/documents/${id}/issue`, { confirm: true, receiverRevision: 0 }, { headers })).status, 409);
+});
+
+
+test('restricted products block their complete fiscal group without filtering sale lines', async () => {
+  const f = fixture();
+  f.products.get(ids.gravado).billingEnabled = false;
+  const groups = await f.service.saleGroups(ids.sale, f.branch);
+  const blocked = groups.find(group => group.taxType === 'GRAVADO');
+  assert.equal(blocked.billingEnabled, false); assert.equal(blocked.total, 118);
+  assert.deepEqual(blocked.blockedProducts, ['Producto gravado']);
+  assert.equal(groups.find(group => group.taxType === 'EXONERADO').billingEnabled, true);
+  for (const documentType of ['BOLETA', 'FACTURA']) {
+    await assert.rejects(f.service.preview({ ...f.input, documentType }, f.branch), /no está habilitado/);
+    await assert.rejects(f.service.createDraft({ ...f.input, documentType }, f.branch, ids.user), /no está habilitado/);
+  }
+  assert.equal(f.calls.create, 0); assert.equal(f.calls.submit, 0); assert.equal(f.calls.reserve, 0);
+  assert.equal(f.sale.items.length, 3);
+});
+
+test('disabling a product invalidates old drafts before claiming or reserving a fiscal number', async () => {
+  const f = fixture();
+  const draft = await f.service.createDraft(f.input, f.branch, ids.user);
+  f.products.get(ids.gravado).billingEnabled = false;
+  await assert.rejects(f.service.createDraft(f.input, f.branch, ids.user), /no está habilitado/);
+  await assert.rejects(f.service.simulate(draft.id, ids.branch), /no está habilitado/);
+  await assert.rejects(f.service.issue(draft.id, f.branch, ids.user, 0), /no está habilitado/);
+  assert.equal(f.records.get(draft.id).status, 'DRAFT');
+  assert.equal(f.calls.submit, 0); assert.equal(f.calls.reserve, 0);
+  f.products.get(ids.gravado).billingEnabled = true;
+  const issued = await f.service.issue(draft.id, f.branch, ids.user, 0);
+  assert.equal(issued.status, 'ACCEPTED');
+  f.products.get(ids.gravado).billingEnabled = false;
+  assert.equal((await f.service.findById(draft.id, ids.branch)).status, 'ACCEPTED');
+  f.records.get(draft.id).cancelledByCreditNoteId = ids.foreign;
+  f.records.get(draft.id).cancelledAt = new Date();
+  await assert.rejects(f.service.preview({ ...f.input, replacesDocumentId: draft.id }, f.branch), /no está habilitado/);
+});
+
+test('changing a sales note to a fiscal voucher checks current product eligibility', async () => {
+  const { UpdateVoucherUseCase } = require('../dist/application/use-cases/sale/update-voucher.use-case');
+  let writes = 0;
+  const sale = { id: ids.sale, voucherType: 'NONE', items: [{ productId: ids.gravado }] };
+  const repository = { findById: async () => sale, update: async (_, patch) => { writes++; Object.assign(sale, patch); return sale; } };
+  const product = { name: 'Restringido', billingEnabled: false };
+  const useCase = new UpdateVoucherUseCase(repository, { hasActiveSale: async () => false }, { findById: async () => product });
+  for (const type of ['BOLETA', 'FACTURA']) await assert.rejects(useCase.execute(ids.sale, type), /no está habilitado/);
+  assert.equal(writes, 0);
+  product.billingEnabled = true;
+  await useCase.execute(ids.sale, 'BOLETA');
+  product.billingEnabled = false;
+  await useCase.execute(ids.sale, 'NONE');
+  assert.equal(sale.voucherType, 'NONE'); assert.equal(writes, 2);
 });

@@ -11,6 +11,7 @@ import { CreateBillingDraftDto } from '../dtos/billing/create-billing-draft.dto'
 import { FilterBillingDocumentsDto } from '../dtos/billing/filter-billing-documents.dto';
 import { calculateBillingItem, moneyCents, sunatUnit } from './billing-calculation';
 import { normalizeBillingReceiver, sameBillingReceiver } from './billing-receiver';
+import { assertProductAllowsBilling } from './product-billing-eligibility';
 
 @Injectable()
 export class BillingService {
@@ -24,6 +25,10 @@ export class BillingService {
   ) {}
 
   getStatus(branch?: BranchEntity) { return this.provider.getStatus(branch?.billingSeriesCode, branch?.sunatEstablishmentCode); }
+
+  private async assertBillableProducts(items: { productId: string }[]) {
+    for (const productId of new Set(items.map(item => item.productId))) assertProductAllowsBilling(await this.products.findById(productId));
+  }
 
   private receiverFromClient(client: { name: string; documentNumber?: string; address?: string; email?: string } | null): BillingPartySnapshot {
     const number = client?.documentNumber?.replace(/\s/g, '') || '';
@@ -51,14 +56,15 @@ export class BillingService {
     const sale = await this.sales.findById(id, branch.id!);
     if (!sale || sale.branchId !== branch.id) throw new NotFoundException('Venta no encontrada en la sucursal activa');
     if (sale.isCancelled) throw new BadRequestException('La venta está anulada');
-    const groups = new Map<string, { companyId: string; companyName: string; taxType: BillingTaxType; total: number; items: number }>();
+    const groups = new Map<string, { companyId: string; companyName: string; taxType: BillingTaxType; total: number; items: number; billingEnabled: boolean; blockedProducts: string[] }>();
     for (const item of sale.items) {
       if (!branch.companyIds.includes(item.companyId)) continue;
       const [company, product] = await Promise.all([this.companies.findById(item.companyId), this.products.findById(item.productId)]);
       const taxType = item.taxType || product?.taxType;
       if (!company?.isActive || !taxType || !['GRAVADO', 'EXONERADO', 'INAFECTO'].includes(taxType)) continue;
       const key = `${item.companyId}:${taxType}`;
-      const group = groups.get(key) || { companyId: item.companyId, companyName: company.name, taxType: taxType as BillingTaxType, total: 0, items: 0 };
+      const group = groups.get(key) || { companyId: item.companyId, companyName: company.name, taxType: taxType as BillingTaxType, total: 0, items: 0, billingEnabled: true, blockedProducts: [] };
+      if (product?.billingEnabled === false) { group.billingEnabled = false; if (!group.blockedProducts.includes(product.name)) group.blockedProducts.push(product.name); }
       group.total = (moneyCents(group.total) + moneyCents(item.subtotal)) / 100;
       group.items++;
       groups.set(key, group);
@@ -103,6 +109,7 @@ export class BillingService {
       const taxType = item.taxType ?? product?.taxType;
       if (!taxType) throw new BadRequestException(`Completa la afectación tributaria de ${item.productName || 'un producto de la venta'}`);
       if (taxType !== dto.taxType) continue;
+      assertProductAllowsBilling(product);
       if (!item.taxType || item.taxRate == null || !item.unit) legacyTaxData = true;
       const unit = item.unit || product?.unit;
       if (!unit) throw new BadRequestException('Completa la unidad de medida del producto');
@@ -149,6 +156,7 @@ export class BillingService {
 
   private async previewReissue(dto:CreateBillingDraftDto,branch:BranchEntity):Promise<BillingDocumentEntity> {
     const original=await this.findById(dto.replacesDocumentId!,branch.id!);
+    await this.assertBillableProducts(original.items);
     if (!original.cancelledByCreditNoteId || !original.cancelledAt || original.status!=='ACCEPTED') throw new BadRequestException('Primero debe aceptarse la nota de crédito que anula este comprobante');
     if (original.saleId!==dto.saleId || original.companyId!==dto.companyId || original.taxType!==dto.taxType || !branch.companyIds.includes(original.companyId)) throw new BadRequestException('La nueva emisión debe corresponder al mismo pedido, empresa y afectación tributaria');
     if (original.replacementDocumentId) {
@@ -188,9 +196,10 @@ export class BillingService {
     }
   }
 
-  private existingDraft(existing: BillingDocumentEntity, documentType: string, receiver?: BillingPartySnapshot) {
+  private async existingDraft(existing: BillingDocumentEntity, documentType: string, receiver?: BillingPartySnapshot) {
     if (existing.status !== 'DRAFT') throw new ConflictException('Este grupo de productos ya tiene un comprobante enviado o en revisión');
     if (existing.documentType !== documentType) throw new ConflictException('Ya existe un borrador de otro tipo para este grupo. Descártalo antes de crear uno nuevo');
+    await this.assertBillableProducts(existing.items);
     if (receiver && !sameBillingReceiver(existing.receiver, normalizeBillingReceiver(existing.documentType, existing.total, receiver))) throw new ConflictException('Ya existe un borrador con otro receptor. Ábrelo y edita el receptor antes del envío');
     return existing;
   }
@@ -205,6 +214,7 @@ export class BillingService {
   async simulate(id: string, branchId: string): Promise<BillingSimulation> {
     const document = await this.findById(id, branchId);
     if (document.status !== 'DRAFT') throw new ConflictException('La simulación está disponible para borradores sin enviar');
+    await this.assertBillableProducts(document.items);
     const sale = await this.sales.findById(document.saleId, branchId);
     if (!sale || sale.branchId !== branchId || sale.isCancelled) throw new BadRequestException('La venta de origen no está disponible');
     const calculated = document.items.map(item => calculateBillingItem({ ...item, subtotal: item.total }));
@@ -235,6 +245,7 @@ export class BillingService {
   async issue(id: string, branch: BranchEntity, userId: string, expectedReceiverRevision?: number) {
     const document = await this.findById(id, branch.id!);
     if (document.status !== 'DRAFT') throw new ConflictException('El comprobante ya fue procesado. No se enviará de nuevo');
+    await this.assertBillableProducts(document.items);
     if (expectedReceiverRevision !== undefined && expectedReceiverRevision !== (document.receiverRevision ?? 0)) throw new ConflictException('El receptor cambió después de la revisión. Actualiza el comprobante y confirma nuevamente');
     const sale = await this.sales.findById(document.saleId, branch.id!);
     if (!sale || sale.branchId !== branch.id || sale.isCancelled) throw new BadRequestException('La venta de origen no está disponible para emisión');

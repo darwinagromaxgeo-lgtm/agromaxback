@@ -1,6 +1,7 @@
 export interface QuoteItemEntity {
   productId: string;
   productName?: string;
+  billingEnabled?: boolean;
   unit?: string;
   taxType?: string;
   taxRate?: number;

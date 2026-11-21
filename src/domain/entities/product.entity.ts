@@ -50,6 +50,7 @@ export interface ProductEntity {
   activeIngredient?: string;
   activeIngredients?: ActiveIngredientItem[];
   taxType?: string;
+  billingEnabled?: boolean;
   catalogStatus?: 'READY' | 'PENDING_REVIEW';
   catalogImport?: ProductCatalogImport;
   prices: ProductPrice[];

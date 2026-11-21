@@ -21,6 +21,7 @@ export class MongoProductRepository implements IProductRepository {
       activeIngredient: product.activeIngredient,
       activeIngredients: (product.activeIngredients || []).map(i => ({ name: i.name, concentration: i.concentration || '' })),
       taxType: product.taxType || 'GRAVADO',
+      billingEnabled: product.billingEnabled ?? true,
       catalogStatus: product.catalogStatus || 'READY',
       catalogImport: product.catalogImport,
       prices: product.prices.map((p) => ({ priceTier: p.priceTierId, ...(p.companyId && { company: p.companyId }), ...(p.branchId && { branch: p.branchId }), price: p.price })),
@@ -33,7 +34,7 @@ export class MongoProductRepository implements IProductRepository {
   }
 
   async findAll(
-    filter?: { search?: string; category?: string; activeIngredient?: string; control?: string; isActive?: boolean; sellableOnly?: boolean; supplier?: string; unit?: string; sort?: 'asc' | 'desc' },
+    filter?: { search?: string; category?: string; activeIngredient?: string; control?: string; isActive?: boolean; billingEnabled?: boolean; sellableOnly?: boolean; supplier?: string; unit?: string; sort?: 'asc' | 'desc' },
     page = 1,
     limit = 20,
   ): Promise<{ data: ProductEntity[]; total: number }> {
@@ -50,6 +51,7 @@ export class MongoProductRepository implements IProductRepository {
     if (filter?.supplier) query.supplier = { $regex: filter.supplier, $options: 'i' };
     if (filter?.unit) query.unit = filter.unit;
     query.isActive = filter?.isActive !== undefined ? filter.isActive : true;
+    if (filter?.billingEnabled !== undefined) query.billingEnabled = filter.billingEnabled ? { $ne: false } : false;
     if (filter?.sellableOnly) {
       query.catalogStatus = { $ne: 'PENDING_REVIEW' };
       query.taxType = { $ne: 'PENDIENTE' };
@@ -124,6 +126,7 @@ export class MongoProductRepository implements IProductRepository {
         ? doc.activeIngredients.map((i: any) => ({ name: i.name, concentration: i.concentration || '' }))
         : doc.activeIngredient ? [{ name: doc.activeIngredient, concentration: '' }] : [],
       taxType: doc.taxType || 'GRAVADO',
+      billingEnabled: doc.billingEnabled !== false,
       catalogStatus: doc.catalogStatus || 'READY',
       catalogImport: doc.catalogImport,
       tracksLot: doc.tracksLot ?? false,

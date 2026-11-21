@@ -99,6 +99,7 @@ export class MongoQuoteRepository implements IQuoteRepository {
       items: (doc.items || []).map((i: any) => ({
         productId: i.product?._id?.toString() || i.product?.toString(),
         companyId: i.company?.toString(),
+        billingEnabled: i.product?.billingEnabled !== false,
         productName: i.productName || i.product?.name, unit: i.unit || i.product?.unit, taxType: i.taxType || i.product?.taxType, taxRate: i.taxRate,
         quantity: i.quantity,
         priceTier: i.priceTier,
