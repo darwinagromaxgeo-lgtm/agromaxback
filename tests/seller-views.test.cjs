@@ -80,7 +80,7 @@ test('sellers are limited to sales operations while administrative data and acti
       ['POST', '/product-lots', {}], ['POST', '/stock-adjustments', {}],
     ];
     for (const [method, route, body] of denied) await request(method, route, body, 403);
-    for (const route of ['/auth/me', '/branches/accessible', '/companies', '/categories', '/units', '/price-tiers', '/payment-methods', '/products', `/stock/company/${id(8001)}`, `/stock/availability/${id(8010)}?companyId=${id(8001)}`, `/product-lots?productId=${id(8010)}`, '/clients', '/sales', '/quotes', `/credits/client/${id(8020)}/open`, '/billing/documents']) await request('GET', route);
+    for (const route of ['/auth/me', '/branches/accessible', '/companies', '/categories', '/units', '/price-tiers', '/payment-methods', '/products', `/stock/company/${id(8001)}`, `/stock/branches?companyId=${id(8001)}`, `/stock/availability/${id(8010)}?companyId=${id(8001)}`, `/product-lots?productId=${id(8010)}`, '/clients', '/sales', '/quotes', `/credits/client/${id(8020)}/open`, '/billing/documents']) await request('GET', route);
     const sale = await request('POST', '/sales', { voucherType: 'NONE', items: [{ productId: id(8010), companyId: id(8001), quantity: 1, priceTier: id(8005), unitPrice: 118 }], payments: [{ paymentMethodId: id(8006), amount: 118 }] });
     assert.equal(sale.total, 118, 'Internal cash registration must remain available through a legitimate sale');
     await request('POST', '/clients', { name: 'Cliente sintético del vendedor', documentNumber: '87654321' });

@@ -46,7 +46,11 @@ test('stock adjustments use final quantities and atomic, branch-scoped, retry-sa
     const password = randomBytes(16).toString('hex');
     await seed({ MVP_MODE: 'true', MONGODB_URI: uri, MVP_ADMIN_PASSWORD: password });
     const scope = { branch: oid(8002), company: oid(8001) };
-    await db.collection('branches').insertOne({ _id: oid(8100), name: 'Otra sede', code: 'OTHER', companies: [oid(8001)], isActive: true });
+    await db.collection('branches').updateOne({ _id: oid(8002) }, { $set: { name: 'Sausal' } });
+    await db.collection('branches').insertMany([
+      { _id: oid(8100), name: 'Ascope - Central', code: 'ASCOPE', companies: [oid(8001)], isActive: true },
+      { _id: oid(8102), name: 'Paiján', code: 'PAIJAN', companies: [oid(8001)], isActive: true },
+    ]);
     await db.collection('companies').insertOne({ _id: oid(8101), name: 'Otra empresa', ruc: '20600000009', isActive: true });
     await db.collection('stocks').insertOne({ ...scope, branch: oid(8100), product: oid(8010), quantity: 77 });
     await db.collection('products').insertOne({ _id: oid(8013), name: 'Producto con lotes', category: oid(8004), unit: 'UND', tracksLot: true, isActive: true, prices: [] });
@@ -93,6 +97,25 @@ test('stock adjustments use final quantities and atomic, branch-scoped, retry-sa
       await request('POST', '/stock-adjustments/batch', payload([set(8010, 20, 100)]), 400, '');
       await batch([set(8010, 20, 100)], 403, { companyId: id(8101) });
       assert.equal(await stock(8010), 100);
+    });
+    await t.test('consultation lists all three branches before product selection and keeps zero-stock branches', async () => {
+      const beforeStocks = await db.collection('stocks').find({}).toArray();
+      const beforeAudit = await auditCounts();
+      const branches = await request('GET', `/stock/branches?companyId=${id(8001)}`);
+      assert.deepEqual(branches.map(branch => branch.branchName).sort(), ['Ascope - Central', 'Paiján', 'Sausal']);
+      assert.deepEqual(branches.filter(branch => branch.isCurrent).map(branch => branch.branchName), ['Sausal']);
+      const availability = await request('GET', `/stock/availability/${id(8010)}?companyId=${id(8001)}`);
+      assert.equal(availability.branches.length, 3);
+      assert.deepEqual(Object.fromEntries(availability.branches.map(branch => [branch.branchName, branch.quantity])), { 'Ascope - Central': 77, 'Paiján': 0, 'Sausal': 100 });
+      const other = await request('GET', `/stock/availability/${id(8010)}?companyId=${id(8001)}`, undefined, 200, id(8102));
+      assert.deepEqual(other.branches.filter(branch => branch.isCurrent).map(branch => branch.branchName), ['Paiján']);
+      assert.equal(other.branches.find(branch => branch.branchName === 'Sausal').quantity, 100);
+      await request('GET', '/stock/branches', undefined, 400);
+      await request('GET', '/stock/branches?companyId=invalid', undefined, 400);
+      await request('GET', `/stock/branches?companyId=${id(8101)}`, undefined, 400);
+      await request('GET', `/stock/branches?companyId=${id(8001)}`, undefined, 400, '');
+      assert.deepEqual(await db.collection('stocks').find({}).toArray(), beforeStocks);
+      assert.deepEqual(await auditCounts(), beforeAudit);
     });
     await t.test('establishing 20 records the real decrease instead of adding 20', async () => {
       const result = await batch([set(8010, 20, 100)]);

@@ -33,6 +33,13 @@ export class StockController {
   @SellerAccess()
   async findByCompany(@Param('companyId') companyId: string, @Query() pagination: PaginationDto) { return this.getStockByCompany.execute(companyId, pagination.page, pagination.limit); }
 
+  @Get('branches')
+  @ApiOperation({ summary: 'Listar sucursales para consultar disponibilidad por empresa' })
+  @SellerAccess()
+  async availabilityBranches(@Query() query: GetStockAvailabilityQueryDto, @CurrentBranch('id') branchId: string) {
+    return this.getStockAvailability.listBranches(query.companyId, branchId);
+  }
+
   @Get('availability/:productId')
   @ApiOperation({ summary: 'Consultar stock y precios de un producto en todas las sucursales' })
   @SellerAccess()
