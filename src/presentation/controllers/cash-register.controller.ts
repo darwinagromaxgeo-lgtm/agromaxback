@@ -1,4 +1,5 @@
 import { AccountingRead } from '../../common/decorators/accounting-access.decorator';
+import { SellerAccess } from '../../common/decorators/seller-access.decorator';
 import { Controller, Get, Post, Patch, Delete, Body, Param, Query, Inject, BadRequestException } from '@nestjs/common';
 import { BranchScoped } from '../../common/decorators/branch-scoped.decorator';
 import { ApiTags, ApiOperation, ApiBearerAuth, ApiParam, ApiQuery } from '@nestjs/swagger';
@@ -40,18 +41,21 @@ export class CashRegisterController {
   ) {}
 
   @Post('open')
+  @SellerAccess()
   @ApiOperation({ summary: 'Abrir caja del dia', description: 'Abre la caja diaria o retorna la existente si ya esta abierta (idempotente)' })
   async open(@Body() dto: OpenCashRegisterDto, @CurrentUser('id') userId: string) {
     return this.openCashRegister.execute(dto, userId);
   }
 
   @Get()
+  @SellerAccess()
   @ApiOperation({ summary: 'Listar cajas', description: 'Obtiene historial de cajas con filtros por rango de fechas y estado' })
   async findAll(@Query() filter: FilterCashRegisterDto) {
     return this.getCashRegisters.execute(filter);
   }
 
   @Get('by-date')
+  @SellerAccess()
   @ApiOperation({ summary: 'Obtener caja por fecha', description: 'Busca la caja de una fecha especifica (formato YYYY-MM-DD)' })
   @ApiQuery({ name: 'date', description: 'Fecha en formato YYYY-MM-DD' })
   async findByDate(@Query('date') date: string) {
@@ -59,6 +63,7 @@ export class CashRegisterController {
   }
 
   @Get('today')
+  @SellerAccess()
   @ApiOperation({ summary: 'Obtener caja de hoy', description: 'Retorna la caja del dia actual (timezone Peru) o null si no existe' })
   async findToday() {
     const today = getTodayDateString();
@@ -67,6 +72,7 @@ export class CashRegisterController {
   }
 
   @Get(':id')
+  @SellerAccess()
   @ApiOperation({ summary: 'Obtener caja por ID', description: 'Retorna el detalle completo de una caja con todas sus entradas' })
   @ApiParam({ name: 'id', description: 'ID de la caja' })
   async findById(@Param('id') id: string) {
@@ -100,6 +106,7 @@ export class CashRegisterController {
   }
 
   @Post(':id/close')
+  @SellerAccess()
   @ApiOperation({ summary: 'Cerrar caja', description: 'Cierra la caja del dia. Calcula balance final y bloquea nuevas entradas' })
   @ApiParam({ name: 'id', description: 'ID de la caja' })
   async close(@Param('id') id: string, @Body() dto: CloseRegisterDto, @CurrentUser('id') userId: string) {
