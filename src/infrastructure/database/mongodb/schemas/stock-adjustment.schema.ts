@@ -19,6 +19,9 @@ export class StockAdjustmentDocument {
   @Prop({ type: String, enum: ['INCREASE', 'DECREASE', 'SET'] })
   mode?: string;
 
+  @Prop({ type: String, enum: ['ENTRY', 'EXIT', 'WASTE', 'COUNT'] })
+  movementKind?: string;
+
   @Prop() targetQuantity?: number;
   @Prop() requestId?: string;
 

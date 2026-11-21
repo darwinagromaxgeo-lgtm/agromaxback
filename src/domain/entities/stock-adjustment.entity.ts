@@ -1,3 +1,5 @@
+export type StockAdjustmentMovementKind = 'ENTRY' | 'EXIT' | 'WASTE' | 'COUNT';
+
 export interface StockAdjustmentEntity {
   id?: string;
   productId: string;
@@ -5,6 +7,7 @@ export interface StockAdjustmentEntity {
   branchId?: string;
   type: 'INCREASE' | 'DECREASE';
   mode?: 'INCREASE' | 'DECREASE' | 'SET';
+  movementKind?: StockAdjustmentMovementKind;
   targetQuantity?: number;
   requestId?: string;
   quantity: number;

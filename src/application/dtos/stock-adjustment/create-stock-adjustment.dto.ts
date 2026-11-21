@@ -1,10 +1,12 @@
-import { IsString, IsNumber, IsEnum, Min, Max, IsOptional, IsDateString, IsMongoId, IsUUID, MaxLength, IsNotEmpty, ValidateIf } from 'class-validator';
+import { IsString, IsNumber, IsEnum, IsIn, Min, Max, IsOptional, IsDateString, IsMongoId, IsUUID, MaxLength, IsNotEmpty, ValidateIf } from 'class-validator';
 import { Transform } from 'class-transformer';
 import { StockAdjustmentType } from '../../../domain/enums';
+import { StockAdjustmentMovementKind } from '../../../domain/entities/stock-adjustment.entity';
 
 export class StockAdjustmentItemDto {
   @IsMongoId() productId: string;
   @IsEnum(StockAdjustmentType) type: StockAdjustmentType;
+  @IsOptional() @IsIn(['ENTRY', 'EXIT', 'WASTE', 'COUNT']) movementKind?: StockAdjustmentMovementKind;
   @IsNumber({ maxDecimalPlaces: 6 }) @Min(0) @Max(1e12) quantity: number;
   @ValidateIf((item: StockAdjustmentItemDto) => item.type === StockAdjustmentType.SET || item.expectedQuantity !== undefined)
   @IsNumber({ maxDecimalPlaces: 6 }) @Min(0) @Max(1e12) expectedQuantity?: number;

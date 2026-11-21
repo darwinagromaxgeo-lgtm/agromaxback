@@ -1,8 +1,9 @@
-import { StockAdjustmentEntity } from './stock-adjustment.entity';
+import { StockAdjustmentEntity, StockAdjustmentMovementKind } from './stock-adjustment.entity';
 
 export interface StockAdjustmentItem {
   productId: string;
   type: 'INCREASE' | 'DECREASE' | 'SET';
+  movementKind?: StockAdjustmentMovementKind;
   quantity: number;
   expectedQuantity?: number;
   lotNumber?: string;

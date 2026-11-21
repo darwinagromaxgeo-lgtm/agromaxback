@@ -36,9 +36,9 @@ export class MongoStockAdjustmentRepository implements IStockAdjustmentRepositor
   async applyBatch(input: StockAdjustmentBatch, branchId: string, userId?: string): Promise<StockAdjustmentBatchResult> {
     if (!Types.ObjectId.isValid(branchId)) throw new BadRequestException('Selecciona una sucursal');
     const reason = input.reason.trim();
-    if (!reason || !input.items.length || input.items.length > 100) throw new BadRequestException('Indica el motivo y entre 1 y 100 productos');
+    if (!reason || !input.items.length || input.items.length > 1000) throw new BadRequestException('Indica el motivo y entre 1 y 1000 productos');
     const items = input.items.map(item => ({
-      productId: item.productId.toLowerCase(), type: item.type, quantity: item.quantity,
+      productId: item.productId.toLowerCase(), type: item.type, quantity: item.quantity, movementKind: item.movementKind,
       expectedQuantity: item.expectedQuantity, lotNumber: item.lotNumber?.trim() || undefined,
       expirationDate: item.expirationDate || undefined,
     })).sort((a, b) => a.productId.localeCompare(b.productId));
@@ -61,16 +61,32 @@ export class MongoStockAdjustmentRepository implements IStockAdjustmentRepositor
         if (previous) { result = replay(previous); return; }
         result = { requestId: input.requestId, adjustments: [], unchangedProductIds: [] };
         const date = new Date();
+        // Load the inventory once so a whole-catalog count does not query each unchanged row.
+        const productIds = items.map(item => new Types.ObjectId(item.productId));
+        const productRecords = await this.products.find({ _id: { $in: productIds }, isActive: true }).session(session).lean();
+        const stockRecords = await this.stocks.find({ ...scope, product: { $in: productIds } }).session(session).lean();
+        const lotRecords = await this.lots.find({ ...scope, product: { $in: productIds }, isActive: true, currentQuantity: { $gt: 0 } }).session(session).lean();
+        const productsById = new Map(productRecords.map(product => [product._id.toString(), product]));
+        const stocksByProduct = new Map(stockRecords.map(stock => [stock.product.toString(), stock]));
+        const lotsByProduct = new Map<string, typeof lotRecords>();
+        for (const lot of lotRecords) {
+          const id = lot.product.toString();
+          if (!lotsByProduct.has(id)) lotsByProduct.set(id, []);
+          lotsByProduct.get(id)!.push(lot);
+        }
         // Sequential writes on a single session: stock, lots and their audit all commit together.
         for (const item of items) {
           if (!['INCREASE', 'DECREASE', 'SET'].includes(item.type) || !Number.isFinite(item.quantity) || item.quantity < 0 || item.quantity > 1e12 || (item.type !== 'SET' && item.quantity === 0)) {
             throw new BadRequestException('Indica una cantidad válida. Sumar y restar requieren una cantidad mayor a cero.');
           }
-          const product = await this.products.findOne({ _id: item.productId, isActive: true }).session(session).lean();
+          const movementKind = item.movementKind || (item.type === 'SET' ? 'COUNT' : item.type === 'INCREASE' ? 'ENTRY' : 'EXIT');
+          const expectedType = { ENTRY: 'INCREASE', EXIT: 'DECREASE', WASTE: 'DECREASE', COUNT: 'SET' }[movementKind];
+          if (expectedType !== item.type) throw new BadRequestException('El tipo de movimiento no coincide con la operación de stock');
+          const product = productsById.get(item.productId);
           if (!product) throw new BadRequestException('El producto seleccionado no está disponible');
           const query = { ...scope, product: new Types.ObjectId(item.productId) };
-          const stock = await this.stocks.findOne(query).session(session).lean();
-          const activeLots = await this.lots.find({ ...query, isActive: true, currentQuantity: { $gt: 0 } }).session(session).lean();
+          const stock = stocksByProduct.get(item.productId);
+          const activeLots = lotsByProduct.get(item.productId) || [];
           const previousQuantity = roundQuantity(product.tracksLot
             ? activeLots.reduce((sum, lot) => sum + lot.currentQuantity, 0)
             : stock?.quantity ?? 0);
@@ -111,13 +127,13 @@ export class MongoStockAdjustmentRepository implements IStockAdjustmentRepositor
           await this.stocks.findOneAndUpdate(query, { $set: { quantity: newQuantity, lastUpdated: date }, $setOnInsert: query }, { session, upsert: true });
           const type = delta > 0 ? 'INCREASE' : 'DECREASE';
           const [adjustment] = await this.model.create([{
-            _id: adjustmentId, ...query, type, mode: item.type, targetQuantity: item.type === 'SET' ? item.quantity : undefined,
+            _id: adjustmentId, ...query, type, mode: item.type, movementKind, targetQuantity: item.type === 'SET' ? item.quantity : undefined,
             requestId: input.requestId, quantity: Math.abs(delta), reason, previousQuantity, newQuantity, adjustedBy: userId, date,
           }], { session });
           await this.movements.create([{
             ...query, movementType: delta > 0 ? 'ADJUSTMENT_IN' : 'ADJUSTMENT_OUT', quantity: Math.abs(delta), previousStock: previousQuantity,
             newStock: newQuantity, referenceId: adjustmentId, referenceType: 'Adjustment', user: userId, date,
-            description: `${item.type === 'SET' ? `Ajuste a cantidad final ${newQuantity}` : 'Ajuste'}: ${reason}`,
+            description: `${movementKind === 'WASTE' ? 'Merma' : movementKind === 'ENTRY' ? 'Entrada manual' : movementKind === 'EXIT' ? 'Salida manual' : `Conteo físico a cantidad final ${newQuantity}`}: ${reason}`,
           }], { session });
           result.adjustments.push(this.toEntity(adjustment.toObject()));
         }
@@ -141,6 +157,10 @@ export class MongoStockAdjustmentRepository implements IStockAdjustmentRepositor
       company: adjustment.companyId,
       branch: adjustment.branchId || undefined,
       type: adjustment.type,
+      mode: adjustment.mode,
+      movementKind: adjustment.movementKind,
+      targetQuantity: adjustment.targetQuantity,
+      requestId: adjustment.requestId,
       quantity: adjustment.quantity,
       reason: adjustment.reason,
       previousQuantity: adjustment.previousQuantity,
@@ -179,6 +199,7 @@ export class MongoStockAdjustmentRepository implements IStockAdjustmentRepositor
       branchId: doc.branch?._id?.toString() || doc.branch?.toString(),
       type: doc.type,
       mode: doc.mode,
+      movementKind: doc.movementKind,
       targetQuantity: doc.targetQuantity,
       requestId: doc.requestId,
       quantity: doc.quantity,

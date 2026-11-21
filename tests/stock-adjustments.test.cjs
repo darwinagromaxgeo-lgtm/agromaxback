@@ -172,6 +172,31 @@ test('stock adjustments use final quantities and atomic, branch-scoped, retry-sa
       assert.deepEqual(results.map(result => result.status).sort(), [201, 409]);
       assert.ok([20, 30].includes(await stock(8011)));
     });
+    await t.test('waste, exits, entries and counts keep distinct audit semantics', async () => {
+      const waste = await batch([{ productId: id(8014), type: 'DECREASE', movementKind: 'WASTE', quantity: 3, expectedQuantity: 20 }]);
+      assert.equal(await stock(8014), 17); assert.equal(waste.adjustments[0].movementKind, 'WASTE');
+      const movement = await db.collection('stock_movements').findOne({ referenceId: new mongoose.Types.ObjectId(waste.adjustments[0].id) });
+      assert.equal(movement.movementType, 'ADJUSTMENT_OUT'); assert.match(movement.description, /^Merma:/);
+      await batch([{ productId: id(8014), type: 'DECREASE', movementKind: 'EXIT', quantity: 1, expectedQuantity: 17 }]);
+      await batch([{ productId: id(8014), type: 'INCREASE', movementKind: 'ENTRY', quantity: 2, expectedQuantity: 16 }]);
+      const count = await batch([{ ...set(8014, 20, 18), movementKind: 'COUNT' }]);
+      assert.equal(count.adjustments[0].movementKind, 'COUNT');
+      const counts = await auditCounts();
+      for (const [type, movementKind] of [['INCREASE', 'WASTE'], ['SET', 'ENTRY'], ['DECREASE', 'COUNT']]) await batch([{ productId: id(8014), type, movementKind, quantity: 1, expectedQuantity: 20 }], 400);
+      assert.deepEqual(await auditCounts(), counts); assert.equal(await stock(8014), 20);
+    });
+    await t.test('a whole-catalog count saves more than 100 products and accepts matching counts without false movements', async () => {
+      const numbers = Array.from({ length: 101 }, (_, index) => 8600 + index);
+      await db.collection('products').insertMany(numbers.map(number => ({ _id: oid(number), name: `Conteo ${number}`, category: oid(8004), unit: 'UND', tracksLot: false, isActive: true, prices: [] })));
+      const result = await batch(numbers.map(number => ({ ...set(number, 1, 0), movementKind: 'COUNT' })));
+      assert.equal(result.adjustments.length, 101);
+      assert.equal(await db.collection('stocks').countDocuments({ ...scope, product: { $in: numbers.map(oid) }, quantity: 1 }), 101);
+      const before = await auditCounts();
+      const matching = await batch(numbers.map(number => ({ ...set(number, 1, 1), movementKind: 'COUNT' })));
+      assert.equal(matching.adjustments.length, 0); assert.equal(matching.unchangedProductIds.length, 101);
+      const after = await auditCounts(); assert.equal(after[0], before[0]); assert.equal(after[1], before[1]);
+      await batch(Array.from({ length: 1001 }, (_, index) => set(10000 + index, 1, 0)), 400);
+    });
     await t.test('legacy single adjustments remain supported and all unrelated history is preserved', async () => {
       const result = await request('POST', '/stock-adjustments', { productId: id(8012), companyId: id(8001), type: 'INCREASE', quantity: 2, reason: 'Ajuste individual' });
       assert.equal(result.previousQuantity, 95); assert.equal(result.newQuantity, 97); assert.equal(await stock(8012), 97);

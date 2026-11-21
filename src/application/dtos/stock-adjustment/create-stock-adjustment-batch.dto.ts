@@ -7,7 +7,7 @@ export class CreateStockAdjustmentBatchDto {
   @IsUUID('4') requestId: string;
   @Transform(({ value }) => typeof value === 'string' ? value.trim() : value)
   @IsString() @IsNotEmpty() @MaxLength(500) reason: string;
-  @IsArray() @ArrayMinSize(1) @ArrayMaxSize(100)
+  @IsArray() @ArrayMinSize(1) @ArrayMaxSize(1000)
   @ArrayUnique((item: StockAdjustmentItemDto) => String(item?.productId).toLowerCase())
   @ValidateNested({ each: true }) @Type(() => StockAdjustmentItemDto)
   items: StockAdjustmentItemDto[];
