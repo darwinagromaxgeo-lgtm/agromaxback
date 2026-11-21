@@ -11,6 +11,12 @@ export interface ActiveIngredientItem {
 }
 
 export interface ProductCatalogImport {
+  deduplication?: {
+    canonicalProductId: string;
+    canonicalSku?: string;
+    inventoryConsolidated?: boolean;
+    batch?: string;
+  };
   key: string;
   branchId: string;
   branchName: string;

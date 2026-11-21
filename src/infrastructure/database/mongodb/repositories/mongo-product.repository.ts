@@ -1,4 +1,4 @@
-import { Injectable } from '@nestjs/common';
+import { Injectable, ConflictException } from '@nestjs/common';
 import { InjectModel } from '@nestjs/mongoose';
 import { Model } from 'mongoose';
 import { IProductRepository } from '../../../../domain/repositories/product.repository';
@@ -73,11 +73,19 @@ export class MongoProductRepository implements IProductRepository {
   }
 
   async findByName(name: string): Promise<ProductEntity | null> {
-    const doc = await this.productModel.findOne({ name: { $regex: `^${name}$`, $options: 'i' } }).lean().exec();
+    const literalName = name.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+    const doc = await this.productModel.findOne({ name: { $regex: `^${literalName}$`, $options: 'i' } }).lean().exec();
     return doc ? this.toEntity(doc) : null;
   }
 
   async update(id: string, product: Partial<ProductEntity>): Promise<ProductEntity | null> {
+    if (product.isActive === true) {
+      const current = await this.productModel.findById(id).lean().exec();
+      const consolidation = (current?.catalogImport as ProductEntity['catalogImport'])?.deduplication;
+      if (consolidation?.inventoryConsolidated) {
+        throw new ConflictException(`Esta ficha fue consolidada. Usa el producto principal ${consolidation.canonicalSku || consolidation.canonicalProductId}`);
+      }
+    }
     const updateData: any = { ...product };
     if (product.categoryId) {
       updateData.category = product.categoryId;

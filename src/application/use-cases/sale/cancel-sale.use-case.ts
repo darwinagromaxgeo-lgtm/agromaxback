@@ -33,15 +33,27 @@ export class CancelSaleUseCase {
 
     // 1. Devolver stock por cada item
     for (const item of sale.items) {
-      const stock = await this.stockRepository.findByProductAndCompany(item.productId, item.companyId);
+      let product = await this.productRepository.findById(item.productId);
+      let inventoryProductId = item.productId;
+      const consolidation = product?.catalogImport?.deduplication;
+      if (consolidation?.inventoryConsolidated) {
+        if (!consolidation.canonicalProductId || consolidation.canonicalProductId === item.productId) {
+          throw new BadRequestException('Revisa la ficha principal del producto consolidado antes de devolver stock');
+        }
+        inventoryProductId = consolidation.canonicalProductId;
+        product = await this.productRepository.findById(inventoryProductId);
+        if (!product || product.catalogImport?.deduplication?.inventoryConsolidated) {
+          throw new BadRequestException('La ficha principal del producto consolidado no está disponible');
+        }
+      }
+      const stock = await this.stockRepository.findByProductAndCompany(inventoryProductId, item.companyId);
       const previousStock = stock?.quantity || 0;
-      await this.stockRepository.upsert(item.productId, item.companyId, item.quantity);
+      await this.stockRepository.upsert(inventoryProductId, item.companyId, item.quantity);
 
-      const product = await this.productRepository.findById(item.productId);
       const productLabel = `${product?.name || item.productId} x${item.quantity}`;
 
       if (product?.tracksLot) {
-        const allLots = await this.lotRepository.findByProductAndCompany(item.productId, item.companyId, false);
+        const allLots = await this.lotRepository.findByProductAndCompany(inventoryProductId, item.companyId, false);
         const reverseSorted = [...allLots].sort((a, b) => {
           if (!a.expirationDate && !b.expirationDate) return 0;
           if (!a.expirationDate) return 1;
@@ -60,7 +72,7 @@ export class CancelSaleUseCase {
       }
 
       await this.recordStockMovement.execute({
-        productId: item.productId,
+        productId: inventoryProductId,
         companyId: item.companyId,
         movementType: StockMovementType.ADJUSTMENT_IN,
         quantity: item.quantity,
