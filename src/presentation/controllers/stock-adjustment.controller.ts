@@ -6,6 +6,8 @@ import { GetStockAdjustmentsUseCase } from '../../application/use-cases/stock-ad
 import { CreateStockAdjustmentDto } from '../../application/dtos/stock-adjustment/create-stock-adjustment.dto';
 import { FilterStockAdjustmentDto } from '../../application/dtos/stock-adjustment/filter-stock-adjustment.dto';
 import { CurrentUser } from '../../common/decorators/current-user.decorator';
+import { CurrentBranch } from '../../common/decorators/current-branch.decorator';
+import { CreateStockAdjustmentBatchDto } from '../../application/dtos/stock-adjustment/create-stock-adjustment-batch.dto';
 
 @ApiTags('Stock Adjustments')
 @ApiBearerAuth('JWT')
@@ -18,8 +20,12 @@ export class StockAdjustmentController {
   ) {}
 
   @Post()
-  @ApiOperation({ summary: 'Crear ajuste de stock', description: 'Registra un ajuste manual de inventario (incremento o decremento) con trazabilidad' })
-  async create(@Body() dto: CreateStockAdjustmentDto, @CurrentUser('id') userId: string) { return this.createAdjustment.execute(dto, userId); }
+  @ApiOperation({ summary: 'Crear ajuste de stock', description: 'Suma, resta o establece una cantidad final con trazabilidad' })
+  async create(@Body() dto: CreateStockAdjustmentDto, @CurrentUser('id') userId: string, @CurrentBranch('id') branchId: string) { return this.createAdjustment.execute(dto, branchId, userId); }
+
+  @Post('batch')
+  @ApiOperation({ summary: 'Ajustar varios productos', description: 'Guarda todos los ajustes y sus lotes en una transacción. Detecta cambios de stock y evita duplicar reintentos.' })
+  async createBatch(@Body() dto: CreateStockAdjustmentBatchDto, @CurrentUser('id') userId: string, @CurrentBranch('id') branchId: string) { return this.createAdjustment.executeBatch(dto, branchId, userId); }
 
   @Get()
   @ApiOperation({ summary: 'Listar ajustes de stock', description: 'Obtiene historial de ajustes con filtros por producto, empresa y rango de fechas' })

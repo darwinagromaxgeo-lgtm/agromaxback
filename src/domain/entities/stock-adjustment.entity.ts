@@ -4,6 +4,9 @@ export interface StockAdjustmentEntity {
   companyId: string;
   branchId?: string;
   type: 'INCREASE' | 'DECREASE';
+  mode?: 'INCREASE' | 'DECREASE' | 'SET';
+  targetQuantity?: number;
+  requestId?: string;
   quantity: number;
   reason: string;
   previousQuantity: number;
