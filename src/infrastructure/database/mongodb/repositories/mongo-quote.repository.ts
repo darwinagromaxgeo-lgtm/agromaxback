@@ -62,7 +62,7 @@ export class MongoQuoteRepository implements IQuoteRepository {
       if (filter.endDate) query.issueDate.$lte = filter.endDate;
     }
     const [data, total] = await Promise.all([
-      this.quoteModel.find(query).populate('items.product').populate('client').sort({ issueDate: -1 }).skip((page - 1) * limit).limit(limit).lean().exec(),
+      this.quoteModel.find(query).populate('items.product').populate('client').populate('createdBy', 'fullName email').sort({ issueDate: -1 }).skip((page - 1) * limit).limit(limit).lean().exec(),
       this.quoteModel.countDocuments(query).exec(),
     ]);
     return { data: data.map((d) => this.toEntity(d)), total };
@@ -71,7 +71,7 @@ export class MongoQuoteRepository implements IQuoteRepository {
   async findById(id: string, branchId?: string): Promise<QuoteEntity | null> {
     const query: any = { _id: id };
     if (branchId) query.branch = new Types.ObjectId(branchId);
-    const doc = await this.quoteModel.findOne(query).populate('items.product').populate('client').lean().exec();
+    const doc = await this.quoteModel.findOne(query).populate('items.product').populate('client').populate('createdBy', 'fullName email').lean().exec();
     return doc ? this.toEntity(doc) : null;
   }
 
@@ -94,9 +94,12 @@ export class MongoQuoteRepository implements IQuoteRepository {
       companyId: doc.company?._id?.toString() || doc.company?.toString(),
       clientId: doc.client?._id?.toString() || doc.client?.toString(),
       clientName: doc.clientName || doc.client?.name,
+      clientDetails: doc.client?.name ? { name: doc.client.name, documentNumber: doc.client.documentNumber, address: doc.client.address, phone: doc.client.phone, email: doc.client.email } : undefined,
+      createdByName: doc.createdBy?.fullName, createdByEmail: doc.createdBy?.email,
       items: (doc.items || []).map((i: any) => ({
         productId: i.product?._id?.toString() || i.product?.toString(),
         companyId: i.company?.toString(),
+        productName: i.productName || i.product?.name, unit: i.unit || i.product?.unit, taxType: i.taxType || i.product?.taxType, taxRate: i.taxRate,
         quantity: i.quantity,
         priceTier: i.priceTier,
         unitPrice: i.unitPrice,
@@ -108,7 +111,7 @@ export class MongoQuoteRepository implements IQuoteRepository {
       issueDate: doc.issueDate,
       validUntil: doc.validUntil,
       convertedSaleId: doc.convertedSaleId?.toString(),
-      createdBy: doc.createdBy?.toString(),
+      createdBy: doc.createdBy?._id?.toString() || doc.createdBy?.toString(),
       createdAt: doc.createdAt,
       updatedAt: doc.updatedAt,
     };

@@ -56,6 +56,10 @@ export class SaleDocument {
   @Prop({ type: MongooseSchema.Types.ObjectId, ref: 'BranchDocument', required: true })
   branch: Types.ObjectId;
 
+  @Prop() noteSeries?: string;
+  @Prop() noteNumber?: number;
+  @Prop() noteNumberedAt?: Date;
+
   @Prop({ type: MongooseSchema.Types.ObjectId, ref: 'CompanyDocument' })
   company: Types.ObjectId;
 
@@ -108,3 +112,12 @@ SaleSchema.index({ branch: 1, company: 1, date: -1 });
 SaleSchema.index({ client: 1 });
 SaleSchema.index({ 'items.product': 1 });
 SaleSchema.index({ isCredit: 1 });
+SaleSchema.index({ branch: 1, noteSeries: 1, noteNumber: 1 }, { unique: true, partialFilterExpression: { noteNumber: { $type: 'number' } } });
+
+@Schema({ collection: 'sale_note_counters' })
+export class SaleNoteCounterDocument {
+  @Prop({ type: MongooseSchema.Types.ObjectId, required: true }) _id: Types.ObjectId;
+  @Prop({ required: true }) series: string;
+  @Prop({ required: true }) sequence: number;
+}
+export const SaleNoteCounterSchema = SchemaFactory.createForClass(SaleNoteCounterDocument);

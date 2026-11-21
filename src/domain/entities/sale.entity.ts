@@ -20,6 +20,9 @@ export interface SalePaymentEntity {
 export interface SaleEntity {
   id?: string;
   branchId?: string;
+  noteSeries?: string;
+  noteNumber?: number;
+  noteNumberedAt?: Date;
   companyId?: string;
   clientId?: string;
   items: SaleItemEntity[];

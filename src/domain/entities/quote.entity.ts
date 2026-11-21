@@ -1,5 +1,9 @@
 export interface QuoteItemEntity {
   productId: string;
+  productName?: string;
+  unit?: string;
+  taxType?: string;
+  taxRate?: number;
   companyId: string;
   quantity: number;
   priceTier: string;
@@ -18,6 +22,9 @@ export interface QuoteEntity {
   companyId?: string;
   clientId?: string;
   clientName?: string;
+  clientDetails?: { name: string; documentNumber?: string; address?: string; phone?: string; email?: string };
+  createdByName?: string;
+  createdByEmail?: string;
   items: QuoteItemEntity[];
   total: number;
   notes?: string;

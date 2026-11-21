@@ -1,6 +1,6 @@
 import { Module, forwardRef } from '@nestjs/common';
 import { MongooseModule } from '@nestjs/mongoose';
-import { SaleDocument, SaleSchema } from '../infrastructure/database/mongodb/schemas/sale.schema';
+import { SaleDocument, SaleSchema, SaleNoteCounterDocument, SaleNoteCounterSchema } from '../infrastructure/database/mongodb/schemas/sale.schema';
 import { MongoSaleRepository } from '../infrastructure/database/mongodb/repositories/mongo-sale.repository';
 import { SALE_REPOSITORY } from '../domain/repositories/sale.repository';
 import { CreateSaleUseCase } from '../application/use-cases/sale/create-sale.use-case';
@@ -20,7 +20,7 @@ import { BillingPersistenceModule } from './billing-persistence.module';
 import { UserModule } from './user.module';
 
 @Module({
-  imports: [MongooseModule.forFeature([{ name: SaleDocument.name, schema: SaleSchema }]), StockModule, forwardRef(() => CashRegisterModule), CreditAccountModule, ProductModule, StockMovementModule, PaymentMethodModule, ProductLotModule, ClientModule, BillingPersistenceModule, UserModule],
+  imports: [MongooseModule.forFeature([{ name: SaleDocument.name, schema: SaleSchema }, { name: SaleNoteCounterDocument.name, schema: SaleNoteCounterSchema }]), StockModule, forwardRef(() => CashRegisterModule), CreditAccountModule, ProductModule, StockMovementModule, PaymentMethodModule, ProductLotModule, ClientModule, BillingPersistenceModule, UserModule],
   controllers: [SaleController],
   providers: [{ provide: SALE_REPOSITORY, useClass: MongoSaleRepository }, CreateSaleUseCase, GetSalesUseCase, CancelSaleUseCase, UpdateVoucherUseCase],
   exports: [SALE_REPOSITORY, CreateSaleUseCase],

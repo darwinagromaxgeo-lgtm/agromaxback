@@ -13,6 +13,10 @@ import { CancelSaleDto } from '../../application/dtos/sale/cancel-sale.dto';
 import { UpdateVoucherDto } from '../../application/dtos/sale/update-voucher.dto';
 import { CurrentUser } from '../../common/decorators/current-user.decorator';
 import { CurrentBranch } from '../../common/decorators/current-branch.decorator';
+import { Roles } from '../../common/decorators/roles.decorator';
+import { IsMongoId } from 'class-validator';
+
+class SaleIdParams { @IsMongoId() id: string; }
 
 @ApiTags('Sales')
 @ApiBearerAuth('JWT')
@@ -42,6 +46,15 @@ export class SaleController {
   @ApiOperation({ summary: 'Listar ventas', description: 'Obtiene lista paginada de ventas con filtros opcionales' })
   @SellerAccess()
   async findAll(@Query() filter: FilterSaleDto) { return this.getSales.execute(filter); }
+
+  @Get(':id')
+  @SellerAccess()
+  async findOne(@Param() params: SaleIdParams, @CurrentBranch('id') branchId: string) { return this.getSales.findById(params.id, branchId); }
+
+  @Post(':id/note-number')
+  @Roles('ADMIN', 'VENDEDOR')
+  @SellerAccess()
+  async ensureNoteNumber(@Param() params: SaleIdParams, @CurrentBranch('id') branchId: string) { return this.getSales.ensureNoteNumber(params.id, branchId); }
 
   @Patch(':id/voucher')
   @ApiOperation({ summary: 'Actualizar comprobante', description: 'Cambia el tipo de comprobante de una venta' })

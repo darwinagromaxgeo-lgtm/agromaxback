@@ -16,7 +16,8 @@
     "start:prod": "node dist/main",
     "migrate:branch-clients": "node --env-file-if-exists=.env scripts/migrate-branch-clients.js",
     "seed": "ts-node src/infrastructure/database/seeders/seed.ts",
-    "test:accounting": "npm run build && node --test tests/accounting-access.test.cjs tests/seller-views.test.cjs"
+    "test:accounting": "npm run build && node --test tests/accounting-access.test.cjs tests/seller-views.test.cjs",
+    "test:commercial-documents": "npm run build && node --test tests/commercial-documents.test.cjs tests/credit-checkout.test.cjs"
   },
   "dependencies": {
     "@nestjs/axios": "^4.0.1",

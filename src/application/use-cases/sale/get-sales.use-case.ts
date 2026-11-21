@@ -1,4 +1,4 @@
-import { Injectable, Inject } from '@nestjs/common';
+import { Injectable, Inject, NotFoundException } from '@nestjs/common';
 import { ISaleRepository, SALE_REPOSITORY } from '../../../domain/repositories/sale.repository';
 import { FilterSaleDto } from '../../dtos/sale/filter-sale.dto';
 
@@ -13,5 +13,17 @@ export class GetSalesUseCase {
       endDate: filter.endDate ? new Date(filter.endDate + 'T23:59:59.999-05:00') : undefined,
       voucherType: filter.voucherType,
     }, filter.page, filter.limit);
+  }
+
+  async findById(id: string, branchId: string) {
+    const sale = await this.saleRepository.findById(id, branchId);
+    if (!sale) throw new NotFoundException('Venta no encontrada');
+    return sale;
+  }
+
+  async ensureNoteNumber(id: string, branchId: string) {
+    const sale = await this.saleRepository.ensureNoteNumber(id, branchId);
+    if (!sale) throw new NotFoundException('Venta no encontrada');
+    return sale;
   }
 }

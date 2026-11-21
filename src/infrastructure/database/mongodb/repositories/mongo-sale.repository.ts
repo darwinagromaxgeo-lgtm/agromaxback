@@ -1,18 +1,21 @@
 import { Injectable } from '@nestjs/common';
 import { InjectModel } from '@nestjs/mongoose';
-import { Model } from 'mongoose';
+import { Model, Types } from 'mongoose';
 import { ISaleRepository } from '../../../../domain/repositories/sale.repository';
 import { SaleEntity } from '../../../../domain/entities/sale.entity';
-import { SaleDocument, SaleDoc } from '../schemas/sale.schema';
+import { SaleDocument, SaleDoc, SaleNoteCounterDocument } from '../schemas/sale.schema';
 
 @Injectable()
 export class MongoSaleRepository implements ISaleRepository {
   constructor(
     @InjectModel(SaleDocument.name) private readonly saleModel: Model<SaleDoc>,
+    @InjectModel(SaleNoteCounterDocument.name) private readonly noteCounters: Model<SaleNoteCounterDocument>,
   ) {}
 
   async create(sale: SaleEntity): Promise<SaleEntity> {
+    const numbering = sale.branchId ? await this.reserveNoteNumber(sale.branchId) : {};
     const created = await this.saleModel.create({
+      ...numbering,
       branch: sale.branchId || undefined,
       company: sale.companyId || undefined,
       client: sale.clientId || undefined,
@@ -31,6 +34,28 @@ export class MongoSaleRepository implements ISaleRepository {
       date: sale.date, createdBy: sale.createdBy || undefined,
     });
     return this.toEntity(created.toObject());
+  }
+
+  private async reserveNoteNumber(branchId: string) {
+    const branch = await this.saleModel.db.collection('branches').findOne({ _id: new Types.ObjectId(branchId) }, { projection: { billingSeriesCode: 1, code: 1 } });
+    const suffix = String(branch?.billingSeriesCode || branch?.code || '00').replace(/[^A-Z0-9]/gi, '').toUpperCase().slice(0, 2).padStart(2, '0');
+    const counter = await this.noteCounters.findByIdAndUpdate(branchId,
+      { $setOnInsert: { series: `NV${suffix}` }, $inc: { sequence: 1 } },
+      { new: true, upsert: true, setDefaultsOnInsert: false }).lean().exec();
+    return { noteSeries: counter.series, noteNumber: counter.sequence, noteNumberedAt: new Date() };
+  }
+
+  async ensureNoteNumber(id: string, branchId: string): Promise<SaleEntity | null> {
+    this.saleModel.db.base.set('transactionAsyncLocalStorage', true);
+    return this.saleModel.db.transaction(async () => {
+      const sale = await this.saleModel.findOne({ _id: id, branch: branchId }).lean().exec();
+      if (!sale) return null;
+      if (sale.noteSeries && sale.noteNumber) return this.toEntity(sale);
+      const numbering = await this.reserveNoteNumber(branchId);
+      const numbered = await this.saleModel.findOneAndUpdate({ _id: id, branch: branchId, noteNumber: { $exists: false } }, { $set: numbering }, { new: true }).lean().exec();
+      if (!numbered) throw new Error('No se pudo conservar el correlativo de la nota de venta');
+      return this.toEntity(numbered);
+    });
   }
 
   async findAll(
@@ -130,6 +155,7 @@ export class MongoSaleRepository implements ISaleRepository {
     return {
       id: doc._id.toString(),
       branchId: doc.branch?._id?.toString() || doc.branch?.toString(),
+      noteSeries: doc.noteSeries, noteNumber: doc.noteNumber, noteNumberedAt: doc.noteNumberedAt,
       companyId: doc.company?._id?.toString() || doc.company?.toString(),
       clientId: doc.client?._id?.toString() || doc.client?.toString(),
       items: (doc.items || []).map((i: any) => ({
