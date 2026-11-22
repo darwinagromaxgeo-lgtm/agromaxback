@@ -22,6 +22,11 @@ import { StockRequestController } from '../presentation/controllers/stock-reques
 import { StockMovementModule } from './stock-movement.module';
 import { ProductLotModule } from './product-lot.module';
 import { BranchModule } from './branch.module';
+import { BRANCH_TRANSFER_MODEL, BranchTransferSchema } from '../infrastructure/database/mongodb/schemas/branch-transfer.schema';
+import { MongoBranchTransferRepository } from '../infrastructure/database/mongodb/repositories/mongo-branch-transfer.repository';
+import { BRANCH_TRANSFER_REPOSITORY } from '../domain/repositories/branch-transfer.repository';
+import { DirectBranchTransferUseCase } from '../application/use-cases/stock/direct-branch-transfer.use-case';
+import { BranchTransferController } from '../presentation/controllers/branch-transfer.controller';
 
 @Module({
   imports: [
@@ -30,17 +35,20 @@ import { BranchModule } from './branch.module';
       { name: StockTransferDocument.name, schema: StockTransferSchema },
       { name: ProductDocument.name, schema: ProductSchema },
       { name: StockRequestDocument.name, schema: StockRequestSchema },
+      { name: BRANCH_TRANSFER_MODEL, schema: BranchTransferSchema },
     ]),
     StockMovementModule,
     ProductLotModule,
     BranchModule,
   ],
-  controllers: [StockController, StockRequestController],
+  controllers: [StockController, StockRequestController, BranchTransferController],
   providers: [
     { provide: STOCK_REPOSITORY, useClass: MongoStockRepository },
     { provide: STOCK_TRANSFER_REPOSITORY, useClass: MongoStockTransferRepository },
     { provide: PRODUCT_REPOSITORY, useClass: MongoProductRepository },
     { provide: STOCK_REQUEST_REPOSITORY, useClass: MongoStockRequestRepository },
+    { provide: BRANCH_TRANSFER_REPOSITORY, useClass: MongoBranchTransferRepository },
+    DirectBranchTransferUseCase,
     GetStockByCompanyUseCase,
     TransferStockUseCase,
     GetLowStockAlertsUseCase,

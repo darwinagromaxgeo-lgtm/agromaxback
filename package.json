@@ -7,7 +7,7 @@
     "test:security": "npm run build && node --test --test-isolation=none tests/security-regression.test.cjs",
     "test:billing": "npm run build && node --test tests/billing-regression.test.cjs",
     "test:credit-notes": "npm run build && node --test tests/credit-notes.test.cjs",
-    "test:stock": "npm run build && node --test tests/stock-adjustments.test.cjs",
+    "test:stock": "npm run build && node --test tests/stock-adjustments.test.cjs tests/branch-transfers.test.cjs",
     "test:availability": "npm run build && node --test tests/stock-availability.test.cjs tests/stock-adjustments.test.cjs tests/seller-views.test.cjs",
     "test:mvp": "npm run build && node --test tests/mvp-integration.test.cjs",
     "test:checkout": "npm run build && node --test tests/credit-checkout.test.cjs",
