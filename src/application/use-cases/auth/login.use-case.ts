@@ -18,11 +18,10 @@ export class LoginUseCase {
 
     if (user.role === 'VENDEDOR') {
       const limaTime = new Date(new Date().toLocaleString('en-US', { timeZone: 'America/Lima' }));
-      const day = limaTime.getDay(); // 0=Domingo, 1=Lunes … 6=Sábado
       const totalMinutes = limaTime.getHours() * 60 + limaTime.getMinutes();
 
-      if (day === 0 || totalMinutes < 360 || totalMinutes > 1260) {
-        throw new UnauthorizedException('El ingreso de vendedores está habilitado de lunes a sábado, de 6:00 a. m. a 9:00 p. m. (hora de Perú)');
+      if (totalMinutes < 360 || totalMinutes > 1260) {
+        throw new UnauthorizedException('El ingreso de vendedores está habilitado todos los días, de 6:00 a. m. a 9:00 p. m. (hora de Perú)');
       }
     }
 

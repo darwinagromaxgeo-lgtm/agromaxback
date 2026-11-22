@@ -12,7 +12,7 @@ const user = {
 const repository = account => ({ findByUsername: async username => username === account.username ? account : null });
 const jwt = { sign: payload => JSON.stringify(payload) };
 
-test('vendor login accepts 06:00–21:00 in Peru, keeps assigned branches and rejects hours outside the window', async context => {
+test('vendor login accepts 06:00–21:00 every day including Sunday in Peru and keeps assigned roles and branches', async context => {
   context.mock.timers.enable({ apis: ['Date'], now: new Date('2026-11-20T11:00:00Z') });
   const login = new LoginUseCase(repository(user), jwt);
   const cases = [
@@ -24,7 +24,11 @@ test('vendor login accepts 06:00–21:00 in Peru, keeps assigned branches and re
     ['2026-11-21T02:00:00Z', true],  // Friday 21:00.
     ['2026-11-21T02:01:00Z', false], // Friday 21:01.
     ['2026-11-21T11:00:00Z', true],  // Saturday 06:00.
-    ['2026-11-22T15:00:00Z', false], // Sunday remains outside working days.
+    ['2026-11-22T10:59:00Z', false], // Sunday 05:59 Lima.
+    ['2026-11-22T11:00:00Z', true],  // Sunday 06:00.
+    ['2026-11-22T15:00:00Z', true],  // Sunday 10:00.
+    ['2026-11-23T02:00:00Z', true],  // Sunday 21:00 while UTC is Monday.
+    ['2026-11-23T02:01:00Z', false], // Sunday 21:01.
     ['2026-11-23T11:00:00Z', true],  // Monday 06:00.
   ];
   for (const [instant, allowed] of cases) {
