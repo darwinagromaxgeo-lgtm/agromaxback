@@ -1,4 +1,4 @@
-import { Injectable, Inject, NotFoundException, ConflictException } from '@nestjs/common';
+import { Injectable, Inject, NotFoundException, ConflictException, BadRequestException } from '@nestjs/common';
 import { IUserRepository, USER_REPOSITORY } from '../../../domain/repositories/user.repository';
 import { UpdateUserDto } from '../../dtos/user/update-user.dto';
 
@@ -22,7 +22,10 @@ export class UpdateUserUseCase {
       if (existing) throw new ConflictException('El email ya esta registrado');
     }
 
-    const updated = await this.userRepository.update(id, dto);
+    const role = dto.role || user.role;
+    const branchAssignments = role === 'ADMIN' ? [] : (dto.branchAssignments ?? user.branchAssignments ?? []);
+    if (role !== 'ADMIN' && !branchAssignments.length) throw new BadRequestException('Asigna al menos una sucursal al usuario');
+    const updated = await this.userRepository.update(id, { ...dto, branchAssignments });
     const { password, ...result } = updated;
     return result;
   }

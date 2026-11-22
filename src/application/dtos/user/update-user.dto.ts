@@ -1,5 +1,5 @@
-import { IsArray, IsString, IsOptional, MinLength, IsIn, IsEmail, ValidateNested } from 'class-validator';
-import { Type } from 'class-transformer';
+import { IsArray, IsString, IsOptional, MinLength, IsIn, IsEmail, ValidateNested, ValidateIf } from 'class-validator';
+import { Type, Transform } from 'class-transformer';
 import { UserBranchAssignmentDto } from './create-user.dto';
 
 export class UpdateUserDto {
@@ -18,7 +18,8 @@ export class UpdateUserDto {
   @MinLength(3)
   username?: string;
 
-  @IsOptional()
+  @Transform(({ value }) => typeof value === 'string' ? value.trim() : value)
+  @ValidateIf((_, value) => value !== undefined && value !== '')
   @IsEmail()
   email?: string;
 

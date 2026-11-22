@@ -69,7 +69,9 @@ export class MongoUserRepository implements IUserRepository {
         role: assignment.role,
       }));
     }
-    const doc = await this.userModel.findByIdAndUpdate(id, update, { new: true }).lean().exec();
+    const removeEmail = data.email === '';
+    if (removeEmail) delete update.email;
+    const doc = await this.userModel.findByIdAndUpdate(id, { $set: update, ...(removeEmail ? { $unset: { email: 1 } } : {}) }, { new: true }).lean().exec();
     return this.toEntity(doc);
   }
 

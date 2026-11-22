@@ -1,5 +1,5 @@
 import { IsArray, IsEmail, IsString, MinLength, IsOptional, IsIn, IsMongoId, ValidateNested } from 'class-validator';
-import { Type } from 'class-transformer';
+import { Type, Transform } from 'class-transformer';
 
 export class UserBranchAssignmentDto {
   @IsMongoId()
@@ -10,10 +10,12 @@ export class UserBranchAssignmentDto {
 }
 
 export class CreateUserDto {
+  @Transform(({ value }) => typeof value === 'string' ? value.trim() : value)
   @IsString()
   @MinLength(3)
   username: string;
 
+  @Transform(({ value }) => typeof value === 'string' ? value.trim() || undefined : value)
   @IsOptional()
   @IsEmail()
   email?: string;
@@ -22,6 +24,7 @@ export class CreateUserDto {
   @MinLength(6)
   password: string;
 
+  @Transform(({ value }) => typeof value === 'string' ? value.trim() : value)
   @IsString()
   @MinLength(2)
   fullName: string;

@@ -12,7 +12,7 @@ export class FilterUserDto extends PaginationDto {
   role?: string;
 
   @IsOptional()
-  @Transform(({ value }) => value === 'true')
+  @Transform(({ obj, key }) => obj[key] === 'true' ? true : obj[key] === 'false' ? false : obj[key])
   @IsBoolean()
   isActive?: boolean;
 }
