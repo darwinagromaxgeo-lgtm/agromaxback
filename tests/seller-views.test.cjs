@@ -19,7 +19,7 @@ async function freePort() {
   return port;
 }
 
-test('sellers sell and reconcile their branch cash while administrative actions and other branches are protected', { timeout: 90000 }, async () => {
+test('sellers sell, reconcile cash and consult branch credits while administrative actions and other branches are protected', { timeout: 90000 }, async () => {
   const temporary = fs.mkdtempSync(path.join(os.tmpdir(), 'agromax-seller-access-'));
   fs.mkdirSync(path.join(temporary, 'db'));
   const processes = [], descriptors = [];
@@ -69,7 +69,22 @@ test('sellers sell and reconcile their branch cash while administrative actions 
     const { JwtService } = require('@nestjs/jwt');
     const jwt = new JwtService({ secret: jwtSecret });
     const sellerAuthorization = `Bearer ${jwt.sign({ sub: seller.id, username: seller.username, role: 'VENDEDOR' })}`;
+    const oid = number => new mongoose.Types.ObjectId(id(number));
+    const creditTemplate = { client:oid(8020), name:'Crédito de prueba', sales:[], totalAmount:118, paidAmount:18, pendingAmount:100, status:'PARTIAL', payments:[{amount:18,paymentDate:new Date(),paymentMethodName:'Efectivo'}], createdAt:new Date(), updatedAt:new Date() };
+    await db.collection('credit_accounts').insertMany([
+      { ...creditTemplate, _id:oid(9200), branch:oid(8002) },
+      { ...creditTemplate, _id:oid(9201), branch:oid(8100), totalAmount:999, pendingAmount:981 },
+    ]);
+    const creditsBefore = await db.collection('credit_accounts').find().sort({_id:1}).toArray();
     authorization = sellerAuthorization;
+    const creditList = await request('GET','/credits');
+    assert.equal(creditList.total,1); assert.equal(creditList.data[0].id,id(9200)); assert.equal(creditList.data[0].pendingAmount,100);
+    const clientCredits = await request('GET','/credits/client/'+id(8020));
+    assert.deepEqual(clientCredits.data.map(credit=>credit.id),[id(9200)]);
+    const creditDetail = await request('GET','/credits/'+id(9200));
+    assert.equal(creditDetail.id,id(9200)); assert.equal(creditDetail.payments.length,1); assert.equal(creditDetail.payments[0].amount,18);
+    assert.equal(await request('GET','/credits/'+id(9201)),null,'Foreign credit IDs stay outside the current branch');
+    for (const route of ['/credits','/credits/client/'+id(8020),'/credits/'+id(9201)]) await request('GET',route,undefined,403,id(8100));
     const denied = [
       ['GET', '/dashboard/summary'], ['GET', '/dashboard/financial-overview'],
       ['POST', `/cash-registers/${id(9000)}/entries`, {}],
@@ -80,12 +95,16 @@ test('sellers sell and reconcile their branch cash while administrative actions 
       ['GET', '/stock-movements'], ['POST', '/stock/transfer', {}],
       ['GET', '/users'], ['GET', '/branches'], ['POST', '/companies', {}],
       ['POST', '/categories', {}], ['POST', '/units', {}], ['POST', '/payment-methods', {}],
-      ['GET', '/credits'], ['GET', '/loans'], ['GET', '/products/price-floor-alerts'],
+      ['POST', '/credits/payments/batch', {}], ['POST', '/credits/'+id(9200)+'/payments', {}],
+      ['PATCH', '/credits/'+id(9200), {}],
+      ['POST', '/credits/'+id(9200)+'/add-sale', {}], ['DELETE', '/credits/'+id(9200), {}],
+      ['GET', '/loans'], ['GET', '/products/price-floor-alerts'],
       ['GET', '/billing/credit-notes'], ['POST', '/billing/credit-notes', {}],
       ['DELETE', `/sales/${id(9000)}`, { reason: 'No autorizado' }],
       ['POST', '/product-lots', {}], ['POST', '/stock-adjustments', {}],
     ];
     for (const [method, route, body] of denied) await request(method, route, body, 403);
+    assert.deepEqual(await db.collection('credit_accounts').find().sort({_id:1}).toArray(),creditsBefore,'Credit consultation and denied operations cannot change balances or payments');
     assert.equal(await request('GET', '/cash-registers/today'), null);
     let register = await request('POST', '/cash-registers/open', { openingBalance: 100 });
     assert.equal(register.openingBalance, 100);

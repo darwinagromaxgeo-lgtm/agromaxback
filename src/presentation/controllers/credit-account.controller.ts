@@ -41,6 +41,7 @@ export class CreditAccountController {
   ) {}
 
   @Get()
+  @SellerAccess()
   @ApiOperation({ summary: 'Listar creditos', description: 'Obtiene todos los creditos con filtros por cliente y estado' })
   async findAll(@Query() filter: FilterCreditDto) { return this.getAllCredits.execute(filter); }
 
@@ -50,6 +51,7 @@ export class CreditAccountController {
   async findOpenByClient(@Param('clientId') clientId: string) { return this.creditRepository.findOpenByClientId(clientId); }
 
   @Get('client/:clientId')
+  @SellerAccess()
   @ApiOperation({ summary: 'Creditos de un cliente', description: 'Obtiene todos los creditos de un cliente especifico' })
   @ApiParam({ name: 'clientId', description: 'ID del cliente' })
   @ApiQuery({ name: 'page', required: false })
@@ -57,6 +59,7 @@ export class CreditAccountController {
   async findByClient(@Param('clientId') clientId: string, @Query('page') page?: number, @Query('limit') limit?: number) { return this.getClientCredits.execute(clientId, page, limit); }
 
   @Get(':id')
+  @SellerAccess()
   @ApiOperation({ summary: 'Detalle de credito', description: 'Obtiene el detalle de un credito con su historial de pagos' })
   @ApiParam({ name: 'id', description: 'ID del credito' })
   async findById(@Param('id') id: string) { return this.creditRepository.findById(id); }
