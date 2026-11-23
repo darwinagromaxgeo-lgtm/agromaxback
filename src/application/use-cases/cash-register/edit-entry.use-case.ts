@@ -24,7 +24,7 @@ export class EditEntryUseCase {
     if (dto.paymentMethodId && (!method || !method.isActive)) throw new BadRequestException('Método de pago no encontrado o inactivo');
     const previousMethod = entryPaymentMethod(entry);
     const methodChanged = !!method && (entry.paymentMethodId !== method.id || previousMethod !== method.name);
-    const linked = !!entry.referenceId && ['Sale', 'CreditAccount'].includes(entry.referenceType || '');
+    const linked = !!entry.referenceId || ['SALE', 'CREDIT_PAYMENT'].includes(entry.category);
     if (linked && methodChanged && previousMethod && cashMethodKey(previousMethod) !== cashMethodKey(method!.name)) {
       throw new BadRequestException('El método de pago pertenece a la venta o abono original. Corrígelo desde su operación de origen');
     }
@@ -34,18 +34,18 @@ export class EditEntryUseCase {
     const voucherSeriesChanged = dto.voucherSeries !== undefined && (dto.voucherSeries || '') !== (entry.voucherSeries || '');
     const voucherNumberChanged = dto.voucherNumber !== undefined && (dto.voucherNumber || '') !== (entry.voucherNumber || '');
 
+    if (linked && (voucherChanged || voucherSeriesChanged || voucherNumberChanged)) {
+      throw new BadRequestException('El comprobante, su serie y su número pertenecen a la operación original y no se pueden modificar desde Caja. Revisa el comprobante desde su operación de origen');
+    }
+
     if (!amountChanged && !voucherChanged && !voucherSeriesChanged && !voucherNumberChanged && !methodChanged) {
       throw new BadRequestException('No hay cambios para guardar.');
     }
 
-    // Bloquear cambio de MONTO en entradas auto-generadas (ventas o pagos de crédito).
-    // El monto de esas entradas es un reflejo de la venta/pago original; modificarlo acá
-    // desincroniza la caja con la fuente y genera descuadres. El cambio de voucherType
-    // (BOLETA / NONE) sí está permitido, ya que es un dato propio de la entrada.
-    if (amountChanged && entry.referenceId && (entry.referenceType === 'Sale' || entry.referenceType === 'CreditAccount')) {
-      const origen = entry.referenceType === 'Sale' ? 'una venta' : 'un pago de crédito';
+    // Los movimientos automáticos reflejan el importe y el comprobante de su origen.
+    if (amountChanged && linked) {
       throw new BadRequestException(
-        `No se puede modificar el monto de esta entrada porque proviene de ${origen}. Si necesitás corregir el monto, anulá la operación original y registrala nuevamente. (Cambiar el comprobante BOLETA/NONE sí está permitido.)`,
+        'No se puede modificar el monto de esta entrada porque pertenece a una operación vinculada. Revisa su corrección desde la operación de origen',
       );
     }
 

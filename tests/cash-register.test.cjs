@@ -93,6 +93,11 @@ test('cash movements distinguish physical money, preserve their sources and clos
     await request('PATCH', `/cash-registers/${registerId}/entries/${saleEntry.id}`, { amount: 67, reason: 'Intento de alterar venta' }, 400);
     await request('PATCH', `/cash-registers/${registerId}/entries/${saleEntry.id}`, { amount: 68, reason: 'Intento de alterar medio', paymentMethodId: yape.id }, 400);
     for (const linked of register.entries.filter(e => e.referenceId)) {
+      const before = await request('GET', '/cash-registers/today');
+      for (const change of [{ voucherType: 'BOLETA' }, { voucherType: 'FACTURA' }, { voucherSeries: 'B999' }, { voucherNumber: '99999999' }]) {
+        await request('PATCH', `/cash-registers/${registerId}/entries/${linked.id}`, { amount: linked.amount, reason: 'Intento de alterar comprobante de origen', ...change }, 400);
+      }
+      assert.deepEqual(await request('GET', '/cash-registers/today'), before, 'A rejected voucher edit must leave cash and audit history unchanged');
       await request('DELETE', `/cash-registers/${registerId}/entries/${linked.id}`, { reason: 'Intento de separar cobro' }, 400);
     }
     assert.equal((await request('GET', '/cash-registers/today')).entries.filter(e => e.isDeleted).length, 0);

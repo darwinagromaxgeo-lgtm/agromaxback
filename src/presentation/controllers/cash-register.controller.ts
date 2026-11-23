@@ -90,7 +90,7 @@ export class CashRegisterController {
   }
 
   @Patch(':id/entries/:entryId')
-  @ApiOperation({ summary: 'Editar entrada de caja', description: 'Modifica el monto de una entrada existente. Guarda historial de edicion con razon obligatoria' })
+  @ApiOperation({ summary: 'Editar entrada de caja', description: 'Corrige movimientos manuales con motivo e historial. En operaciones vinculadas conserva el importe y el comprobante original; permite identificar un método de pago faltante' })
   @ApiParam({ name: 'id', description: 'ID de la caja' })
   @ApiParam({ name: 'entryId', description: 'ID de la entrada' })
   async updateEntry(@Param('id') id: string, @Param('entryId') entryId: string, @Body() dto: EditEntryDto, @CurrentUser('id') userId: string) {
