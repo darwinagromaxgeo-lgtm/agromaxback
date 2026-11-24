@@ -87,11 +87,11 @@ test('sellers sell, reconcile cash and consult branch credits while administrati
     for (const route of ['/credits','/credits/client/'+id(8020),'/credits/'+id(9201)]) await request('GET',route,undefined,403,id(8100));
     const denied = [
       ['GET', '/dashboard/summary'], ['GET', '/dashboard/financial-overview'],
-      ['POST', `/cash-registers/${id(9000)}/entries`, {}],
       ['PATCH', `/cash-registers/${id(9000)}/entries/${id(9001)}`, {}],
       ['DELETE', `/cash-registers/${id(9000)}/entries/${id(9001)}`, {}],
       ['PATCH', `/cash-registers/${id(9000)}/opening-balance`, {}],
       ['GET', '/purchases'], ['POST', '/purchases', {}], ['GET', '/accounts-payable'],
+      ['GET', '/suppliers'], ['POST', '/suppliers', {}],
       ['GET', '/stock-movements'], ['POST', '/stock/transfer', {}],
       ['GET', '/users'], ['GET', '/branches'], ['POST', '/companies', {}],
       ['POST', '/categories', {}], ['POST', '/units', {}], ['POST', '/payment-methods', {}],
@@ -111,6 +111,28 @@ test('sellers sell, reconcile cash and consult branch credits while administrati
     assert.equal((await request('GET', '/cash-registers')).data.length, 1);
     assert.equal((await request('GET', '/cash-registers/by-date?date='+register.date)).id, register.id);
     assert.equal((await request('GET', '/cash-registers/'+register.id)).id, register.id);
+    const movement = { paymentMethodId: id(8006), description: 'Movimiento diario del vendedor', voucherType: 'NONE' };
+    for (const item of [
+      { type: 'INCOME', category: 'OTHER', amount: 10 },
+      { type: 'EXPENSE', category: 'OPERATING_EXPENSE', amount: 3.25 },
+      { type: 'EXPENSE', category: 'WITHDRAWAL', amount: 6.75 },
+    ]) {
+      register = await request('POST', `/cash-registers/${register.id}/entries`, { ...movement, ...item });
+      assert.equal(register.entries.at(-1).createdBy, seller.id);
+      assert.equal(register.entries.at(-1).category, item.category);
+      assert.equal(register.entries.at(-1).amount, item.amount);
+    }
+    const cashBefore = await db.collection('cash_registers').findOne({ _id: new mongoose.Types.ObjectId(register.id) });
+    for (const category of ['ADJUSTMENT', 'PURCHASE']) await request('POST', `/cash-registers/${register.id}/entries`, { ...movement, type: 'EXPENSE', category, amount: 1 }, 403);
+    for (const body of [
+      { type: 'INCOME', category: 'SALE', amount: 1 },
+      { type: 'INCOME', category: 'CREDIT_PAYMENT', amount: 1 },
+      { type: 'INCOME', category: 'OTHER', amount: 1, referenceId: id(9000), referenceType: 'Sale' },
+      { type: 'EXPENSE', category: 'OPERATING_EXPENSE', amount: 0 },
+    ]) await request('POST', `/cash-registers/${register.id}/entries`, { ...movement, ...body }, 400);
+    await request('POST', `/cash-registers/${foreignRegister.id}/entries`, { ...movement, type: 'EXPENSE', category: 'OPERATING_EXPENSE', amount: 1 }, 400);
+    await request('POST', `/cash-registers/${foreignRegister.id}/entries`, { ...movement, type: 'EXPENSE', category: 'OPERATING_EXPENSE', amount: 1 }, 403, id(8100));
+    assert.deepEqual(await db.collection('cash_registers').findOne({ _id: cashBefore._id }), cashBefore, 'Rejected categories and references cannot alter cash or its revision');
     for (const route of ['/cash-registers', '/cash-registers/today', '/cash-registers/by-date?date='+register.date, '/cash-registers/'+foreignRegister.id]) await request('GET', route, undefined, 403, id(8100));
     await request('POST', '/cash-registers/open', { openingBalance: 1 }, 403, id(8100));
     await request('POST', '/cash-registers/'+foreignRegister.id+'/close', {}, 403, id(8100));
@@ -124,6 +146,7 @@ test('sellers sell, reconcile cash and consult branch credits while administrati
     authorization = `Bearer ${jwt.sign({ sub: seller.id, username: seller.username, role: 'ADMIN' })}`;
     await request('GET', '/cash-registers/today');
     await request('PATCH', '/cash-registers/'+register.id+'/opening-balance', { openingBalance: 999, reason: 'No autorizado' }, 403);
+    await request('POST', `/cash-registers/${register.id}/entries`, { ...movement, type: 'EXPENSE', category: 'ADJUSTMENT', amount: 1 }, 403);
     authorization = adminAuthorization;
     for (const route of ['/dashboard/summary', '/cash-registers/today', '/purchases', '/accounts-payable', '/users']) await request('GET', route);
     const accounts = await request('GET', '/users?limit=100');
@@ -142,6 +165,7 @@ test('sellers sell, reconcile cash and consult branch credits while administrati
     assert.equal(register.cashCount.expectedAmount, 218);
     assert.equal(register.cashCount.countedAmount, 218);
     assert.equal(register.cashCount.difference, 0);
+    await request('POST', `/cash-registers/${register.id}/entries`, { ...movement, type: 'EXPENSE', category: 'OPERATING_EXPENSE', amount: 1 }, 400);
     assert.equal(register.closedBy, seller.id);
     assert.equal((await request('GET', '/cash-registers/'+register.id)).cashCount.difference, 0);
     authorization = adminAuthorization;
