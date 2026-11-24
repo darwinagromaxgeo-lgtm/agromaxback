@@ -14,6 +14,7 @@ export interface BillingCreditNoteEntity extends Omit<BillingDocumentEntity, 'do
 }
 export interface CreditNoteRequest {
   returnType: 'CANCEL' | 'TOTAL' | 'PARTIAL';
+  cancelSaleOnAcceptance?: boolean;
   reason: string;
   items?: { itemIndex: number; quantity: number }[];
 }

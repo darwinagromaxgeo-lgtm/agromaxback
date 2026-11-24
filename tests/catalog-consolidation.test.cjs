@@ -1,41 +1,7 @@
 require('reflect-metadata');
 const { test } = require('node:test');
 const assert = require('node:assert/strict');
-const { CancelSaleUseCase } = require('../dist/application/use-cases/sale/cancel-sale.use-case');
 const { MongoProductRepository } = require('../dist/infrastructure/database/mongodb/repositories/mongo-product.repository');
-
-test('cancelling a legacy sale restores the principal stock and preserves its original product reference', async () => {
-  const item = { productId: 'bonus', companyId: 'company', quantity: 2 };
-  const sale = { id: 'sale', isCancelled: false, isCredit: false, items: [item] };
-  const products = {
-    bonus: { id: 'bonus', name: 'Producto anterior BON', isActive: false, catalogImport: { deduplication: { inventoryConsolidated: true, canonicalProductId: 'normal' } } },
-    normal: { id: 'normal', name: 'Producto normal', isActive: true, tracksLot: false },
-  };
-  const writes = [], movements = [];
-  const useCase = new CancelSaleUseCase(
-    { findById: async () => sale, update: async (_, data) => ({ ...sale, ...data }) },
-    { findByProductAndCompany: async id => { assert.equal(id, 'normal'); return { quantity: 156 }; }, upsert: async (...args) => writes.push(args) },
-    { findById: async id => products[id] }, {}, { findAll: async () => ({ data: [], total: 0 }) }, {},
-    { execute: async data => movements.push(data) }, { hasSubmittedSale: async () => false },
-  );
-  await useCase.execute('sale', 'Error de registro', 'admin');
-  assert.deepEqual(writes, [['normal', 'company', 2]]);
-  assert.equal(movements[0].productId, 'normal');
-  assert.deepEqual([movements[0].previousStock, movements[0].newStock], [156, 158]);
-  assert.equal(sale.items[0].productId, 'bonus');
-});
-
-test('a missing principal prevents any partial inventory return', async () => {
-  let writes = 0;
-  const useCase = new CancelSaleUseCase(
-    { findById: async () => ({ id:'sale', items:[{productId:'bonus'}] }) },
-    { upsert: async () => writes++ },
-    { findById: async id => id==='bonus' ? { catalogImport:{deduplication:{inventoryConsolidated:true,canonicalProductId:'missing'}} } : null },
-    {}, {}, {}, {}, { hasSubmittedSale:async()=>false },
-  );
-  await assert.rejects(useCase.execute('sale','Error','admin'), /ficha principal/);
-  assert.equal(writes, 0);
-});
 
 test('consolidated aliases cannot be reactivated through direct updates or imports', async () => {
   let updates = 0;

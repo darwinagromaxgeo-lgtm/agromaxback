@@ -80,7 +80,7 @@ export class CreateSaleUseCase {
       if (!isCredit || !credit || credit.branchId !== branchId) {
         throw new BadRequestException('Cuenta de crédito no encontrada en la sucursal activa');
       }
-      if (credit.status === 'PAID') {
+      if (['PAID', 'CANCELLED'].includes(credit.status)) {
         throw new BadRequestException('La cuenta de crédito ya está completamente pagada');
       }
       if (credit.clientId !== dto.clientId) {
@@ -90,7 +90,9 @@ export class CreateSaleUseCase {
 
     const stockSnapshots: Map<string, number> = new Map();
     const productSnapshots = new Map<string, ProductEntity>();
-    for (const item of dto.items) {
+    const plannedLots = new Map<string, { id: string; currentQuantity: number }[]>();
+    const allocations: { lotId: string; quantity: number }[][] = [];
+    for (const [index, item] of dto.items.entries()) {
       const product = await this.productRepository.findById(item.productId);
       if (!product) throw new BadRequestException('Producto no encontrado');
       if (product.isActive === false) throw new BadRequestException(`El producto "${product.name}" está desactivado`);
@@ -101,8 +103,21 @@ export class CreateSaleUseCase {
       productSnapshots.set(item.productId, product);
       let available: number;
       if (product?.tracksLot) {
-        const lots = await this.lotRepository.findByProductAndCompany(item.productId, item.companyId, true);
+        const key = `${item.productId}:${item.companyId}`;
+        if (!plannedLots.has(key)) plannedLots.set(key, (await this.lotRepository.findByProductAndCompany(item.productId, item.companyId, true)).map(lot => ({ id: lot.id!, currentQuantity: lot.currentQuantity })));
+        const lots = plannedLots.get(key)!;
         available = lots.reduce((sum, l) => sum + l.currentQuantity, 0);
+        const selected = item.lotId ? lots.filter(lot => lot.id === item.lotId) : lots;
+        let remaining = item.quantity;
+        allocations[index] = [];
+        for (const lot of selected) {
+          const quantity = Math.min(remaining, lot.currentQuantity);
+          if (quantity <= 0) continue;
+          allocations[index].push({ lotId: lot.id, quantity });
+          lot.currentQuantity -= quantity;
+          remaining = Math.round((remaining - quantity) * 1e6) / 1e6;
+        }
+        if (remaining > 0) throw new BadRequestException(`Sin stock suficiente en los lotes seleccionados de "${product.name}"`);
       } else {
         const stock = await this.stockRepository.findByProductAndCompany(item.productId, item.companyId);
         available = stock?.quantity ?? 0;
@@ -121,7 +136,7 @@ export class CreateSaleUseCase {
       for (const item of dto.items) assertConfiguredSalePrice(productSnapshots.get(item.productId)!, item, branchId);
     }
 
-    const items = dto.items.map((item) => ({
+    const items = dto.items.map((item, index) => ({
       productId: item.productId,
       companyId: item.companyId,
       quantity: item.quantity,
@@ -132,6 +147,7 @@ export class CreateSaleUseCase {
       unit: productSnapshots.get(item.productId)!.unit,
       taxType: productSnapshots.get(item.productId)!.taxType || 'GRAVADO',
       taxRate: (productSnapshots.get(item.productId)!.taxType || 'GRAVADO') === 'GRAVADO' ? 0.18 : 0,
+      lotAllocations: allocations[index],
     }));
     const total = items.reduce((sum, item) => sum + item.subtotal, 0);
     const roundedTotal = Math.round(total * 100) / 100;
@@ -181,7 +197,7 @@ export class CreateSaleUseCase {
     });
 
     const productNames: string[] = [];
-    for (const item of dto.items) {
+    for (const [index, item] of dto.items.entries()) {
       const previousStock = stockSnapshots.get(`${item.productId}:${item.companyId}`) || 0;
       await this.stockRepository.upsert(item.productId, item.companyId, -item.quantity);
       const product = await this.productRepository.findById(item.productId);
@@ -189,21 +205,7 @@ export class CreateSaleUseCase {
       productNames.push(productLabel);
 
       if (product?.tracksLot) {
-        if (item.lotId) {
-          // Lote seleccionado manualmente (puede ser vencido)
-          await this.lotRepository.consumeQuantity(item.lotId, item.quantity);
-        } else {
-          // FEFO: descontar lotes en orden de vencimiento más próximo primero
-          const lots = await this.lotRepository.findByProductAndCompany(item.productId, item.companyId, true);
-          let remaining = item.quantity;
-          for (const lot of lots) {
-            if (remaining <= 0) break;
-            if (lot.currentQuantity <= 0) continue;
-            const toConsume = Math.min(remaining, lot.currentQuantity);
-            await this.lotRepository.consumeQuantity(lot.id!, toConsume);
-            remaining -= toConsume;
-          }
-        }
+        for (const allocation of items[index].lotAllocations || []) await this.lotRepository.consumeQuantity(allocation.lotId, allocation.quantity);
       }
 
       await this.recordStockMovement.execute({

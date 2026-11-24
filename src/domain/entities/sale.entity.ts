@@ -9,6 +9,7 @@ export interface SaleItemEntity {
   unit?: string;
   taxType?: string;
   taxRate?: number;
+  lotAllocations?: { lotId: string; quantity: number }[];
 }
 
 export interface SalePaymentEntity {

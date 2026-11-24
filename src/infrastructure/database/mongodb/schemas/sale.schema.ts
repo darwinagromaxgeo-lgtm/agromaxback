@@ -33,6 +33,9 @@ export class SaleItemSubdoc {
 
   @Prop({ min: 0, max: 1 })
   taxRate?: number;
+
+  @Prop({ type: [{ _id: false, lotId: { type: MongooseSchema.Types.ObjectId, required: true }, quantity: { type: Number, required: true, min: 0 } }], default: undefined })
+  lotAllocations?: { lotId: Types.ObjectId; quantity: number }[];
 }
 
 export const SaleItemSubdocSchema = SchemaFactory.createForClass(SaleItemSubdoc);

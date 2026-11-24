@@ -10,6 +10,8 @@ export class BillingDocument {
 
   @Prop({ type:Number, default:0 }) reissueRevision: number;
   @Prop({ type:MongoSchema.Types.ObjectId, ref:'BillingCreditNote' }) cancelledByCreditNote?: Types.ObjectId;
+  @Prop() cancelSaleOnAcceptance?: boolean;
+  @Prop() saleCancelledAt?: Date;
   @Prop() cancelledAt?: Date;
   @Prop() cancellationReason?: string;
   @Prop({ type:MongoSchema.Types.ObjectId, ref:'BillingDocument' }) replacesDocument?: Types.ObjectId;

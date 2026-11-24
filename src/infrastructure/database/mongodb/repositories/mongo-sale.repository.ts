@@ -4,6 +4,9 @@ import { Model, Types } from 'mongoose';
 import { ISaleRepository } from '../../../../domain/repositories/sale.repository';
 import { SaleEntity } from '../../../../domain/entities/sale.entity';
 import { SaleDocument, SaleDoc, SaleNoteCounterDocument } from '../schemas/sale.schema';
+import { getCurrentBranchId } from '../../../../common/branch/branch-context';
+import { cancelSaleInTransaction } from '../sale-cancellation';
+import { BadRequestException } from '@nestjs/common';
 
 @Injectable()
 export class MongoSaleRepository implements ISaleRepository {
@@ -11,6 +14,13 @@ export class MongoSaleRepository implements ISaleRepository {
     @InjectModel(SaleDocument.name) private readonly saleModel: Model<SaleDoc>,
     @InjectModel(SaleNoteCounterDocument.name) private readonly noteCounters: Model<SaleNoteCounterDocument>,
   ) {}
+
+  async cancel(id: string, reason: string, userId?: string): Promise<SaleEntity | null> {
+    const branchId = getCurrentBranchId();
+    if (!branchId) throw new BadRequestException('Selecciona la sucursal de la venta');
+    await this.saleModel.db.transaction(session => cancelSaleInTransaction(this.saleModel.db.db!, session, id, branchId, reason, userId));
+    return this.findById(id, branchId);
+  }
 
   async create(sale: SaleEntity): Promise<SaleEntity> {
     const numbering = sale.branchId ? await this.reserveNoteNumber(sale.branchId) : {};
@@ -21,7 +31,7 @@ export class MongoSaleRepository implements ISaleRepository {
       client: sale.clientId || undefined,
       items: sale.items.map((i) => ({
         product: i.productId, company: i.companyId, quantity: i.quantity, priceTier: i.priceTier, unitPrice: i.unitPrice, subtotal: i.subtotal,
-        productName: i.productName, unit: i.unit, taxType: i.taxType, taxRate: i.taxRate,
+        productName: i.productName, unit: i.unit, taxType: i.taxType, taxRate: i.taxRate, lotAllocations: i.lotAllocations,
       })),
       total: sale.total,
       voucherType: sale.voucherType || 'NONE',
@@ -164,6 +174,7 @@ export class MongoSaleRepository implements ISaleRepository {
         unit: i.unit,
         taxType: i.taxType,
         taxRate: i.taxRate,
+        lotAllocations: i.lotAllocations?.map((allocation: any) => ({ lotId: allocation.lotId.toString(), quantity: allocation.quantity })),
         companyId: i.company?._id?.toString() || i.company?.toString(),
         quantity: i.quantity, priceTier: i.priceTier, unitPrice: i.unitPrice, subtotal: i.subtotal,
       })),

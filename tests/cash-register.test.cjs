@@ -149,6 +149,23 @@ test('cash movements distinguish physical money, preserve their sources and clos
     await assert.rejects(repository.addEntry(registerId, { type: 'INCOME', category: 'OTHER', amount: 1, description: 'Cobro tardío' }), /cerrada/);
     await assert.rejects(repository.updateOpenEntry(registerId, manual.id, { amount: 2 }), /cerrada/);
     assert.deepEqual(await db.collection('cash_registers').findOne({ _id: stored._id }), stored);
+    // Real local HTTP checkout records the consumed lot and cancellation is idempotent.
+    const seedProduct = await db.collection('products').findOne({ _id: new mongoose.Types.ObjectId(id(8010)) });
+    const lotProduct = await request('POST', '/products', { name: 'Producto por lotes para anulación', categoryId: String(seedProduct.category), unit: 'UND', tracksLot: true, taxType: 'GRAVADO', prices: [{ priceTierId: id(8005), companyId: id(8001), branchId: otherBranch.id, price: 118 }] });
+    const lotId = new mongoose.Types.ObjectId();
+    const lotScope = { product: new mongoose.Types.ObjectId(lotProduct.id), company: new mongoose.Types.ObjectId(id(8001)), branch: new mongoose.Types.ObjectId(otherBranch.id) };
+    await db.collection('stocks').insertOne({ ...lotScope, quantity: 7 });
+    await db.collection('product_lots').insertOne({ _id: lotId, ...lotScope, lotNumber: 'LOTE-ORIGEN', initialQuantity: 7, currentQuantity: 7, isActive: true });
+    const lotSale = await request('POST', '/sales', { voucherType: 'NONE', items: [{ productId: lotProduct.id, companyId: id(8001), quantity: 2, priceTier: id(8005), unitPrice: 118, lotId: String(lotId) }], payments: [{ paymentMethodId: id(8006), amount: 236 }] }, 201, otherBranch.id);
+    assert.deepEqual(lotSale.items[0].lotAllocations, [{ lotId: String(lotId), quantity: 2 }]);
+    assert.equal((await db.collection('product_lots').findOne({ _id: lotId })).currentQuantity, 5);
+    for (let retry = 0; retry < 2; retry++) {
+      const cancelled = await request('DELETE', `/sales/${lotSale.id}`, { reason: 'Venta de prueba no realizada' }, 200, otherBranch.id);
+      assert.equal(cancelled.isCancelled, true);
+    }
+    assert.equal((await db.collection('stocks').findOne(lotScope)).quantity, 7);
+    assert.equal((await db.collection('product_lots').findOne({ _id: lotId })).currentQuantity, 7);
+    assert.equal(await db.collection('stock_movements').countDocuments({ referenceId: new mongoose.Types.ObjectId(lotSale.id), referenceType: 'SaleCancellation' }), 1);
     assert.equal(await db.collection('billing_documents').countDocuments(), 0, 'Tests must not emit fiscal documents');
   } finally {
     for (const child of processes.reverse()) {

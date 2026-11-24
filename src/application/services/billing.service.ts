@@ -156,6 +156,7 @@ export class BillingService {
 
   private async previewReissue(dto:CreateBillingDraftDto,branch:BranchEntity):Promise<BillingDocumentEntity> {
     const original=await this.findById(dto.replacesDocumentId!,branch.id!);
+    if (original.cancelSaleOnAcceptance) throw new BadRequestException('Este comprobante forma parte de una anulación de venta. Registra una venta nueva si corresponde');
     await this.assertBillableProducts(original.items);
     if (!original.cancelledByCreditNoteId || !original.cancelledAt || original.status!=='ACCEPTED') throw new BadRequestException('Primero debe aceptarse la nota de crédito que anula este comprobante');
     if (original.saleId!==dto.saleId || original.companyId!==dto.companyId || original.taxType!==dto.taxType || !branch.companyIds.includes(original.companyId)) throw new BadRequestException('La nueva emisión debe corresponder al mismo pedido, empresa y afectación tributaria');

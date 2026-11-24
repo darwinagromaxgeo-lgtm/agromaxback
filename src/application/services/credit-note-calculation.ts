@@ -30,6 +30,7 @@ export function buildCreditNote(original: BillingDocumentEntity, notes: BillingC
   if (original.cancelledByCreditNoteId) throw new BadRequestException('El comprobante ya está anulado mediante una nota de crédito');
   const available = creditNoteAvailability(original, notes);
   if (!['CANCEL', 'TOTAL', 'PARTIAL'].includes(request.returnType) || !request.reason?.trim() || request.reason.trim().length > 500) throw new BadRequestException('Indica el tipo de nota y su motivo (hasta 500 caracteres)');
+  if (request.cancelSaleOnAcceptance && request.returnType !== 'CANCEL') throw new BadRequestException('La anulación de la venta requiere una nota de crédito de anulación completa');
   if (/[\u0000-\u0008\u000b\u000c\u000e-\u001f]/.test(request.reason)) throw new BadRequestException('El motivo contiene caracteres no válidos');
   if (request.returnType !== 'PARTIAL' && request.items?.length) throw new BadRequestException('La anulación o devolución total utiliza el comprobante completo; no envíes un detalle parcial');
   if (request.returnType === 'CANCEL' && available.some(line=>line.creditedQuantity>0)) throw new BadRequestException('La anulación completa requiere un comprobante sin notas previas aceptadas o pendientes');
@@ -52,6 +53,7 @@ export function buildCreditNote(original: BillingDocumentEntity, notes: BillingC
   const complete = items.length === original.items.length && items.every(item => quantityUnits(item.quantity) === quantityUnits(original.items[item.originalItemIndex].quantity));
   return {
     branchId:original.branchId, companyId:original.companyId, saleId:original.saleId,
+    ...(request.returnType === 'CANCEL' && request.cancelSaleOnAcceptance === true ? {cancelSaleOnAcceptance:true} : {}),
     documentType:'NOTA_CREDITO', originalDocumentId:original.id!, originalDocumentType:original.documentType,
     originalSeries:original.series!, originalNumber:original.number!, originalIssuedAt:original.submittedAt!,
     reasonCode:request.returnType === 'CANCEL' ? '01' : complete ? '06' : '07', reasonDescription:request.reason.trim(),

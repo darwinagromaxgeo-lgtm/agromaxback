@@ -17,7 +17,7 @@ export class AddSaleToCreditUseCase {
     ]);
 
     if (!credit) throw new BadRequestException('Cuenta de crédito no encontrada');
-    if (credit.status === 'PAID') throw new BadRequestException('La cuenta de crédito ya está completamente pagada');
+    if (['PAID', 'CANCELLED'].includes(credit.status)) throw new BadRequestException('La cuenta de crédito está pagada o anulada');
     if (!sale) throw new BadRequestException('Venta no encontrada en la sucursal activa');
     if (!sale.isCredit) throw new BadRequestException('La venta seleccionada no es una venta a crédito');
     if (!sale.clientId || sale.clientId !== credit.clientId) {

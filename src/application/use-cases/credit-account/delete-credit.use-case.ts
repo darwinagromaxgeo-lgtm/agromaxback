@@ -24,6 +24,7 @@ export class DeleteCreditUseCase {
   async execute(id: string, userId?: string) {
     const credit = await this.creditRepository.findById(id);
     if (!credit) throw new BadRequestException('Crédito no encontrado');
+    if (credit.status === 'CANCELLED') throw new BadRequestException('El crédito anulado se conserva como historial');
     for (const saleId of credit.saleIds || []) {
       if (await this.billingDocuments.hasSubmittedSale(saleId)) throw new BadRequestException('Una venta de la cuenta tiene un comprobante fiscal enviado. Resuelve su situación antes de eliminar el crédito');
     }

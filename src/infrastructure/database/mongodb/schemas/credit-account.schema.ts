@@ -51,7 +51,7 @@ export class CreditAccountDocument {
   @Prop({ required: true })
   pendingAmount: number;
 
-  @Prop({ type: String, enum: ['PENDING', 'PARTIAL', 'PAID'], default: 'PENDING' })
+  @Prop({ type: String, enum: ['PENDING', 'PARTIAL', 'PAID', 'CANCELLED'], default: 'PENDING' })
   status: string;
 
   @Prop({ type: [CreditPaymentSubdocSchema], default: [] })

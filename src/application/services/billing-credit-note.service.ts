@@ -35,7 +35,8 @@ export class BillingCreditNoteService {
   }
   async create(dto:CreateCreditNoteDto, branch:BranchEntity, userId:string) {
     await this.original(dto.originalDocumentId,branch);
-    const requestHash=createHash('sha256').update(JSON.stringify({ originalDocumentId:dto.originalDocumentId,returnType:dto.returnType,reason:dto.reason.trim(),items:dto.items?.slice().sort((a,b)=>a.itemIndex-b.itemIndex) || [] })).digest('hex');
+    if (dto.cancelSaleOnAcceptance && dto.returnType !== 'CANCEL') throw new BadRequestException('La anulación de la venta requiere una nota de crédito de anulación completa');
+    const requestHash=createHash('sha256').update(JSON.stringify({ originalDocumentId:dto.originalDocumentId,returnType:dto.returnType,reason:dto.reason.trim(),items:dto.items?.slice().sort((a,b)=>a.itemIndex-b.itemIndex) || [],...(dto.cancelSaleOnAcceptance === true ? {cancelSaleOnAcceptance:true} : {}) })).digest('hex');
     return this.notes.createDraft(dto.originalDocumentId,branch.id!,dto.requestId,requestHash,(original,previous)=>({ ...buildCreditNote(original,previous,dto), createdBy:userId }));
   }
   list(filter:FilterCreditNotesDto,branchId:string) { return this.notes.findAll(branchId,filter); }

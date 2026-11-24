@@ -35,7 +35,7 @@ export interface CreditAccountEntity {
   totalAmount: number;
   paidAmount: number;
   pendingAmount: number;
-  status: 'PENDING' | 'PARTIAL' | 'PAID';
+  status: 'PENDING' | 'PARTIAL' | 'PAID' | 'CANCELLED';
   payments: CreditPaymentEntity[];
   createdBy?: string;
   createdAt?: Date;

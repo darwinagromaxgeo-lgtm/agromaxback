@@ -1,5 +1,7 @@
 import { AccountingRead } from '../../common/decorators/accounting-access.decorator';
 import { SellerAccess } from '../../common/decorators/seller-access.decorator';
+import { InjectConnection } from '@nestjs/mongoose';
+import { Connection } from 'mongoose';
 import { Controller, Get, Post, Patch, Delete, Body, Param, Query, Inject, ParseFloatPipe } from '@nestjs/common';
 import { BranchScoped } from '../../common/decorators/branch-scoped.decorator';
 import { ApiTags, ApiOperation, ApiBearerAuth, ApiParam, ApiQuery } from '@nestjs/swagger';
@@ -38,6 +40,7 @@ export class CreditAccountController {
     private readonly deleteCreditUseCase: DeleteCreditUseCase,
     private readonly addSaleToCreditUseCase: AddSaleToCreditUseCase,
     @Inject(CREDIT_ACCOUNT_REPOSITORY) private readonly creditRepository: ICreditAccountRepository,
+    @InjectConnection() private readonly connection: Connection,
   ) {}
 
   @Get()
@@ -66,12 +69,18 @@ export class CreditAccountController {
 
   @Post('payments/batch')
   @ApiOperation({ summary: 'Registrar pago por lote', description: 'Registra pagos a múltiples cuentas de crédito de un cliente en una sola operación' })
-  async payBatch(@Body() dto: RegisterBatchPaymentDto, @CurrentUser('id') userId: string) { return this.registerBatchPayment.execute(dto, userId); }
+  async payBatch(@Body() dto: RegisterBatchPaymentDto, @CurrentUser('id') userId: string) {
+    this.connection.base.set('transactionAsyncLocalStorage', true);
+    return this.connection.transaction(() => this.registerBatchPayment.execute(dto, userId));
+  }
 
   @Post(':id/payments')
   @ApiOperation({ summary: 'Registrar pago de credito', description: 'Registra un pago parcial o total de un credito. Crea automaticamente una entrada en la caja del dia' })
   @ApiParam({ name: 'id', description: 'ID del credito' })
-  async pay(@Param('id') id: string, @Body() dto: RegisterPaymentDto, @CurrentUser('id') userId: string) { return this.registerPayment.execute(id, dto, userId); }
+  async pay(@Param('id') id: string, @Body() dto: RegisterPaymentDto, @CurrentUser('id') userId: string) {
+    this.connection.base.set('transactionAsyncLocalStorage', true);
+    return this.connection.transaction(() => this.registerPayment.execute(id, dto, userId));
+  }
 
   @Patch(':id')
   @ApiOperation({ summary: 'Editar credito', description: 'Edita el monto total de un credito. Recalcula el pendiente y el estado' })

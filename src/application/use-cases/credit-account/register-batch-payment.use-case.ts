@@ -57,7 +57,7 @@ export class RegisterBatchPaymentUseCase {
     for (const alloc of allocations) {
       const credit = await this.creditRepo.findById(alloc.creditId);
       if (!credit) throw new BadRequestException(`Crédito ${alloc.creditId} no encontrado`);
-      if (credit.status === 'PAID') throw new BadRequestException(`El crédito ya está completamente pagado`);
+      if (['PAID', 'CANCELLED'].includes(credit.status)) throw new BadRequestException('El crédito está pagado o anulado');
       if (alloc.amount > credit.pendingAmount + 0.001)
         throw new BadRequestException(`El pago excede el monto pendiente. Máximo: ${credit.pendingAmount}`);
 

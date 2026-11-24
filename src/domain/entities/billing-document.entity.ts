@@ -69,6 +69,8 @@ export interface BillingDocumentEntity {
   summaryDate?: string;
   boletaSubmissionMode?: 'individual' | 'summary';
   cancelledByCreditNoteId?: string;
+  cancelSaleOnAcceptance?: boolean;
+  saleCancelledAt?: Date;
   cancelledAt?: Date;
   cancellationReason?: string;
   replacesDocumentId?: string;

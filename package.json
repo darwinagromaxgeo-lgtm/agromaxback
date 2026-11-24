@@ -8,6 +8,7 @@
     "test:billing": "npm run build && node --test tests/billing-regression.test.cjs",
     "test:credit-notes": "npm run build && node --test tests/credit-notes.test.cjs",
     "test:cash": "npm run build && node --test tests/cash-register.test.cjs tests/cash-voucher-lock.test.cjs",
+    "test:cancellation": "npm run build && node --test tests/sale-cancellation.test.cjs tests/credit-notes.test.cjs tests/billing-regression.test.cjs tests/credit-checkout.test.cjs",
     "test:stock": "npm run build && node --test tests/stock-adjustments.test.cjs tests/branch-transfers.test.cjs",
     "test:availability": "npm run build && node --test tests/stock-availability.test.cjs tests/stock-adjustments.test.cjs tests/seller-views.test.cjs",
     "test:mvp": "npm run build && node --test tests/mvp-integration.test.cjs",

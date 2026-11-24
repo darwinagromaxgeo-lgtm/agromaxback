@@ -20,7 +20,7 @@ export class RegisterPaymentUseCase {
   async execute(creditId: string, dto: RegisterPaymentDto, userId?: string) {
     const credit = await this.creditRepository.findById(creditId);
     if (!credit) throw new BadRequestException('Cuenta de crédito no encontrada');
-    if (credit.status === 'PAID') throw new BadRequestException('El crédito ya está completamente pagado');
+    if (['PAID', 'CANCELLED'].includes(credit.status)) throw new BadRequestException('El crédito está pagado o anulado');
     if (!Number.isFinite(dto.amount) || dto.amount <= 0 || Math.abs(dto.amount * 100 - Math.round(dto.amount * 100)) > 0.000001) {
       throw new BadRequestException('El abono debe ser positivo y tener un máximo de dos decimales');
     }

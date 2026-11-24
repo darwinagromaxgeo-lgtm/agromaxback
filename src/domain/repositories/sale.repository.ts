@@ -6,6 +6,7 @@ export interface ISaleRepository {
   findById(id: string, branchId?: string): Promise<SaleEntity | null>;
   ensureNoteNumber(id: string, branchId: string): Promise<SaleEntity | null>;
   update(id: string, data: Partial<SaleEntity>, branchId?: string): Promise<SaleEntity | null>;
+  cancel(id: string, reason: string, userId?: string): Promise<SaleEntity | null>;
 }
 
 export const SALE_REPOSITORY = 'SALE_REPOSITORY';

@@ -1,5 +1,5 @@
-import { Type } from 'class-transformer';
-import { ArrayMaxSize, IsArray, IsIn, IsInt, IsMongoId, IsNumber, IsOptional, IsString, IsUUID, Max, MaxLength, Min, MinLength, ValidateNested } from 'class-validator';
+import { Type, Transform } from 'class-transformer';
+import { ArrayMaxSize, IsArray, IsBoolean, IsIn, IsInt, IsMongoId, IsNumber, IsOptional, IsString, IsUUID, Max, MaxLength, Min, MinLength, ValidateNested } from 'class-validator';
 
 class CreditNoteItemDto {
   @IsInt() @Min(0) itemIndex: number;
@@ -8,6 +8,7 @@ class CreditNoteItemDto {
 export class PreviewCreditNoteDto {
   @IsMongoId() originalDocumentId: string;
   @IsIn(['CANCEL','TOTAL','PARTIAL']) returnType: 'CANCEL' | 'TOTAL' | 'PARTIAL';
+  @IsOptional() @Transform(({obj,key})=>obj[key]) @IsBoolean() cancelSaleOnAcceptance?: boolean;
   @IsString() @MinLength(1) @MaxLength(500) reason: string;
   @IsOptional() @IsArray() @ArrayMaxSize(200) @ValidateNested({ each:true }) @Type(() => CreditNoteItemDto)
   items?: CreditNoteItemDto[];

@@ -99,6 +99,13 @@ test('checkout saves initial credit payments exactly once, preserves branch scop
     const unpaid = credits.find(account => account.saleIds.includes(noDeposit.id));
     assert.deepEqual([unpaid.paidAmount, unpaid.pendingAmount, unpaid.status], [0, 295, 'PENDING']);
     assert.equal((await cashEntries()).length, 3);
+    const voided = await request('DELETE', `/sales/${noDeposit.id}`, { reason: 'Venta a crédito registrada por error' });
+    assert.equal(voided.isCancelled, true);
+    const cancelledCredit = await request('GET', `/credits/${unpaid.id}`);
+    assert.equal(cancelledCredit.status, 'CANCELLED'); assert.equal(cancelledCredit.pendingAmount, 0);
+    const beforeCancelledCreditPayment = await snapshot();
+    await request('POST', `/credits/${unpaid.id}/payments`, { paymentMethodId: id(8006), amount: 1 }, 400);
+    assert.deepEqual(await snapshot(), beforeCancelledCreditPayment, 'A cancelled credit must not accept payments or recreate cash income');
     // Fail after sale/stock/credit writes. The whole transaction must roll back.
     await db.collection('cash_registers').updateMany({}, { $set: { status: 'CLOSED' } });
     const beforeClosed = await snapshot();

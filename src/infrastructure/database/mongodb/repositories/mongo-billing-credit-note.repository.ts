@@ -7,6 +7,7 @@ import { IBillingCreditNoteRepository } from '../../../../domain/repositories/bi
 import { BillingCreditNote } from '../schemas/billing-credit-note.schema';
 import { BillingDocument } from '../schemas/billing-document.schema';
 import { SaleDocument } from '../schemas/sale.schema';
+import { assertCancellationCreditSafe, cancelSaleInTransaction } from '../sale-cancellation';
 
 @Injectable()
 export class MongoBillingCreditNoteRepository implements IBillingCreditNoteRepository, OnModuleInit {
@@ -46,6 +47,7 @@ export class MongoBillingCreditNoteRepository implements IBillingCreditNoteRepos
         if (previous.some(note=>note.holdsReservation)) throw new ConflictException('Ya existe una nota de crédito en borrador o pendiente de resolver para este comprobante. Ábrela desde Notas de crédito');
         const originalEntity={ ...this.entity(original), documentType:original.documentType } as BillingDocumentEntity;
         const note=build(originalEntity, previous.map(doc=>this.entity(doc)));
+        if (note.cancelSaleOnAcceptance) await assertCancellationCreditSafe(this.model.db.db!, note.saleId, branchId, session);
         const { id, branchId:noteBranch, companyId, saleId, originalDocumentId, ...data }=note;
         const saved=await this.model.create([{ ...data, branch:noteBranch, company:companyId, sale:saleId, originalDocument:originalDocumentId, requestId, requestHash, holdsReservation:true }], { session });
         result=this.entity(saved[0].toObject());
@@ -57,6 +59,8 @@ export class MongoBillingCreditNoteRepository implements IBillingCreditNoteRepos
     } finally { await session.endSession(); }
   }
   async claimDraft(id:string, branchId:string, userId:string) {
+    const draft:any=await this.model.findOne({_id:id,branch:branchId,status:'DRAFT'}).lean().exec();
+    if (draft?.cancelSaleOnAcceptance) await assertCancellationCreditSafe(this.model.db.db!, draft.sale, branchId);
     const doc=await this.model.findOneAndUpdate({ _id:id, branch:branchId, status:'DRAFT' }, { $set:{ status:'SENDING', submittedBy:userId, submittedAt:new Date() } }, { new:true, runValidators:true }).lean().exec();
     return doc ? this.entity(doc) : null;
   }
@@ -91,9 +95,18 @@ export class MongoBillingCreditNoteRepository implements IBillingCreditNoteRepos
           // Serialize fiscal changes on the sale: two tax groups can be cancelled concurrently.
           const sale=await this.sales.findOneAndUpdate({_id:doc.sale,branch:doc.branch,isCancelled:{$ne:true}},{$inc:{__v:1}},{new:true,session}).lean().exec();
           if (!sale) throw new ConflictException('No se encontró la venta activa de este comprobante en la sucursal');
-          await this.originals.updateOne({_id:original._id,branch:branchId},{$set:{activeSlot:false,cancelledByCreditNote:doc._id,cancelledAt:new Date(),cancellationReason:doc.reasonDescription},$inc:{creditNoteRevision:1}},{session}).exec();
-          const otherActive=await this.originals.exists({sale:doc.sale,branch:doc.branch,activeSlot:true}).session(session);
-          if (!otherActive) await this.sales.updateOne({_id:doc.sale,branch:doc.branch},{$set:{voucherType:'NONE'}},{session}).exec();
+          await this.originals.updateOne({_id:original._id,branch:branchId},{$set:{activeSlot:false,cancelledByCreditNote:doc._id,cancelledAt:new Date(),cancellationReason:doc.reasonDescription,...(doc.cancelSaleOnAcceptance ? {cancelSaleOnAcceptance:true} : {})},$inc:{creditNoteRevision:1}},{session}).exec();
+          const otherSubmitted=await this.originals.exists({sale:doc.sale,branch:doc.branch,status:{$in:['SENDING','PENDING','UNKNOWN','ACCEPTED']},$nor:[{status:'ACCEPTED',activeSlot:false,cancelledByCreditNote:{$type:'objectId'}}]}).session(session);
+          const cancelSaleRequested=doc.cancelSaleOnAcceptance === true || !!await this.model.exists({sale:doc.sale,branch:doc.branch,status:'ACCEPTED',cancelSaleOnAcceptance:true}).session(session);
+          if (!otherSubmitted && cancelSaleRequested) {
+            await cancelSaleInTransaction(this.model.db.db!, session, doc.sale, doc.branch, doc.reasonDescription, doc.submittedBy || doc.createdBy);
+            const saleCancelledAt=new Date();
+            await this.model.updateMany({sale:doc.sale,branch:doc.branch,status:'ACCEPTED',cancelSaleOnAcceptance:true},{$set:{saleCancelledAt}},{session}).exec();
+            await this.originals.updateMany({sale:doc.sale,branch:doc.branch,cancelledByCreditNote:{$exists:true}},{$set:{saleCancelledAt}},{session}).exec();
+            doc.saleCancelledAt=saleCancelledAt;
+          } else if (!otherSubmitted && !cancelSaleRequested) {
+            await this.sales.updateOne({_id:doc.sale,branch:doc.branch},{$set:{voucherType:'NONE'}},{session}).exec();
+          }
         }
         saved=this.entity(doc);
       },{readConcern:{level:'snapshot'},writeConcern:{w:'majority'}});

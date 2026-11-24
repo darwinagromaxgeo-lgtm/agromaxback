@@ -1,4 +1,4 @@
-import { Injectable } from '@nestjs/common';
+import { Injectable, ConflictException } from '@nestjs/common';
 import { InjectModel } from '@nestjs/mongoose';
 import { Model } from 'mongoose';
 import { ICreditAccountRepository } from '../../../../domain/repositories/credit-account.repository';
@@ -141,24 +141,24 @@ export class MongoCreditAccountRepository implements ICreditAccountRepository {
 
   async update(id: string, data: Partial<CreditAccountEntity>): Promise<CreditAccountEntity | null> {
     const doc = await this.model
-      .findByIdAndUpdate(id, { $set: data }, { new: true })
+      .findOneAndUpdate({ _id: id, status: { $ne: 'CANCELLED' } }, { $set: data }, { new: true })
       .populate('client')
       .populate('payments.receivedBy')
       .lean()
       .exec();
-    if (!doc) return null;
+    if (!doc) throw new ConflictException('El crédito cambió o está anulado. Actualiza la pantalla');
     await this.attachSaleDetails(doc);
     return this.toEntity(doc);
   }
 
   async addPayment(id: string, payment: any): Promise<CreditAccountEntity | null> {
     const doc = await this.model
-      .findByIdAndUpdate(id, { $push: { payments: payment } }, { new: true })
+      .findOneAndUpdate({ _id: id, status: { $in: ['PENDING', 'PARTIAL'] } }, { $push: { payments: payment } }, { new: true })
       .populate('client')
       .populate('payments.receivedBy')
       .lean()
       .exec();
-    if (!doc) return null;
+    if (!doc) throw new ConflictException('El crédito cambió o está anulado. Actualiza la pantalla');
     await this.attachSaleDetails(doc);
     return this.toEntity(doc);
   }
@@ -170,8 +170,8 @@ export class MongoCreditAccountRepository implements ICreditAccountRepository {
     const newPending = Math.round((credit.pendingAmount + amount) * 100) / 100;
     const newStatus = credit.paidAmount > 0 ? 'PARTIAL' : 'PENDING';
     const doc = await this.model
-      .findByIdAndUpdate(
-        id,
+      .findOneAndUpdate(
+        { _id: id, status: { $in: ['PENDING', 'PARTIAL'] } },
         { $push: { sales: saleId }, $set: { totalAmount: newTotal, pendingAmount: newPending, status: newStatus } },
         { new: true },
       )
@@ -179,7 +179,7 @@ export class MongoCreditAccountRepository implements ICreditAccountRepository {
       .populate('payments.receivedBy')
       .lean()
       .exec();
-    if (!doc) return null;
+    if (!doc) throw new ConflictException('El crédito cambió o está anulado. Actualiza la pantalla');
     await this.attachSaleDetails(doc);
     return this.toEntity(doc);
   }

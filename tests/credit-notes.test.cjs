@@ -58,13 +58,20 @@ test('cancellation uses reason 01 for the complete original and refuses previous
   assert.throws(()=>buildCreditNote({...source,cancelledByCreditNoteId:ids.foreign},[],{returnType:'CANCEL',reason:'Anular'}),/ya está anulado/);
   assert.throws(()=>buildCreditNote(source,[],{returnType:'CANCEL',reason:'Anular',items:[{itemIndex:0,quantity:1}]}),/comprobante completo/);
 });
+
+test('full sale reversal is explicit, previewed and unavailable for partial credit notes',()=>{
+  const source=original();
+  assert.equal(buildCreditNote(source,[],{returnType:'CANCEL',reason:'Error de venta',cancelSaleOnAcceptance:true}).cancelSaleOnAcceptance,true);
+  assert.equal(buildCreditNote(source,[],{returnType:'CANCEL',reason:'Flujo anterior'}).cancelSaleOnAcceptance,undefined);
+  assert.throws(()=>buildCreditNote(source,[],{...partial(1),cancelSaleOnAcceptance:true}),/anulación completa/);
+});
 test('pending, unknown and draft returns hold quantities; rejected and discarded ones release them',()=>{
   const source=original(),note=buildCreditNote(source,[],partial(2));
   for(const status of ['DRAFT','SENDING','PENDING','UNKNOWN','ACCEPTED']) assert.equal(creditNoteAvailability(source,[{...note,status}])[0].availableQuantity,1,status);
   for(const status of ['REJECTED','DISCARDED']) assert.equal(creditNoteAvailability(source,[{...note,status}])[0].availableQuantity,3,status);
 });
 
-test('accepted fiscal cancellation unlocks exactly one replacement without changing the order, money or inventory',{skip:!process.env.AGROMAX_TEST_MONGO_URI},async()=>{
+test('legacy fiscal-only cancellation preserves its original reissue behavior',{skip:!process.env.AGROMAX_TEST_MONGO_URI},async()=>{
   assert.match(process.env.AGROMAX_TEST_MONGO_URI,/^mongodb:\/\/(127\.0\.0\.1|localhost):/);
   const connection=await mongoose.createConnection(process.env.AGROMAX_TEST_MONGO_URI,{dbName:'cancellation_'+randomUUID().replace(/-/g,'')}).asPromise();
   try {
@@ -91,11 +98,13 @@ test('accepted fiscal cancellation unlocks exactly one replacement without chang
     let submissions=0,queries=0;
     const provider={getStatus:async()=>({ready:true,environment:'beta',issuerRuc:source.issuer.documentNumber,supportedDocumentTypes:['FACTURA','BOLETA'],series:{FACTURA:'FAG1',BOLETA:'BAG1'},boletaSubmissionMode:'individual',creditNotes:{ready:true,cancellationReady:true,series:{FACTURA:'FNC1',BOLETA:'BNC1'}}}),getCreditNoteNumberingStart:()=>1,getNumberingStart:()=>1,submitCreditNote:async()=>{submissions++;return submissions===1?{status:'UNKNOWN',sunatDescription:'Timeout'}:{status:'ACCEPTED',sunatCode:'0',sunatDescription:'Accepted cancellation',cdrBase64:Buffer.from('PKcdr').toString('base64')};},checkCreditNoteStatus:async()=>{queries++;return queries===1?{status:'PENDING',ticket:'fixture-ticket',sunatDescription:'Pending'}:{status:'ACCEPTED',sunatCode:'0',sunatDescription:'Accepted cancellation',cdrBase64:Buffer.from('PKcdr').toString('base64')};},submit:async()=>({status:'ACCEPTED',sunatCode:'0',sunatDescription:'New receipt',cdrBase64:Buffer.from('PKcdr').toString('base64')})};
     const companies={findById:async()=>({isActive:true,ruc:source.issuer.documentNumber})};
-    const billing=new BillingService(documents,{findById:async()=>structuredClone(sale)},companies,{}, {findById:()=>{throw Error('Historical products must be reused');}},provider);
+    const billing=new BillingService(documents,{findById:async()=>structuredClone(sale)},companies,{}, {findById:async()=>({id:ids.product,isActive:true,billingEnabled:true,catalogStatus:'READY'})},provider);
     const service=new BillingCreditNoteService(documents,repository,provider,companies);
     const branch={id:branchId,companyIds:[companyId],billingSeriesCode:'1'};
-    const request={originalDocumentId:id,returnType:'CANCEL',reason:'Anular comprobante; conservar pedido',requestId:randomUUID()};
+    const request={originalDocumentId:id,returnType:'CANCEL',cancelSaleOnAcceptance:true,reason:'Anular comprobante; conservar pedido',requestId:randomUUID()};
     const cancellation=await service.create(request,branch,ids.user);
+    assert.equal(cancellation.cancelSaleOnAcceptance,true,'New cancellation drafts must request full operational reversal');
+    await notes.updateOne({_id:cancellation.id},{$unset:{cancelSaleOnAcceptance:1}});
     const reissue={saleId,companyId,taxType:'GRAVADO',documentType:'BOLETA',receiver:{name:'CONSUMIDOR FINAL',documentType:'UNIDENTIFIED'},replacesDocumentId:id};
     await assert.rejects(()=>billing.preview(reissue,branch),/debe aceptarse/);
     assert.equal((await service.issue(cancellation.id,branch,ids.user)).status,'UNKNOWN');
@@ -130,6 +139,7 @@ test('accepted fiscal cancellation unlocks exactly one replacement without chang
     assert.equal(await documents.hasSubmittedSale(saleId),true,'An accepted replacement blocks operational cancellation again');
     assert.equal((await sales.findById(saleId).lean()).voucherType,'BOLETA','An accepted replacement restores its fiscal type');
     const secondCancellation=await service.create({...request,originalDocumentId:issued.id,requestId:randomUUID()},branch,ids.user);
+    await notes.updateOne({_id:secondCancellation.id},{$unset:{cancelSaleOnAcceptance:1}});
     assert.equal((await service.issue(secondCancellation.id,branch,ids.user)).status,'ACCEPTED');
     await assert.rejects(()=>billing.preview(reissue,branch),/ya fue reemplazado/);
     const nextDto={...reissue,documentType:'FACTURA',receiver:source.receiver,replacesDocumentId:issued.id};
