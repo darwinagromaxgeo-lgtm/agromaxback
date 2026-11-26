@@ -79,6 +79,7 @@ export class MongoUserRepository implements IUserRepository {
     return {
       id: doc._id.toString(), username: doc.username || doc.email, email: doc.email,
       password: doc.password, fullName: doc.fullName, role: doc.role, isActive: doc.isActive,
+      canTransferStock: doc.canTransferStock === true,
       branchAssignments: (doc.branchAssignments || []).map((assignment: any) => ({
         branchId: assignment.branch?._id?.toString() || assignment.branch?.toString(),
         role: assignment.role,

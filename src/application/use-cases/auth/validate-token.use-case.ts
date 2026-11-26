@@ -8,6 +8,6 @@ export class ValidateTokenUseCase {
   async execute(userId: string) {
     const user = await this.userRepository.findById(userId);
     if (!user || !user.isActive) return null;
-    return { id: user.id, username: user.username, email: user.email, fullName: user.fullName, role: user.role, branchAssignments: user.branchAssignments || [] };
+    return { id: user.id, username: user.username, email: user.email, fullName: user.fullName, role: user.role, branchAssignments: user.branchAssignments || [], canTransferStock: user.canTransferStock === true };
   }
 }

@@ -16,6 +16,7 @@ export class SellerAccessGuard implements CanActivate {
     // Permission changes take effect for existing devices as well as new logins.
     request.user.role = current.role;
     request.user.username = current.username;
+    request.user.canTransferStock = current.canTransferStock === true;
     if (current.role !== 'VENDEDOR') return true;
     if (!this.reflector.getAllAndOverride<boolean>(SELLER_ACCESS_KEY, targets)) {
       throw new ForbiddenException('Esta operación no está disponible para vendedores');

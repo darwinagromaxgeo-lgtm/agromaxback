@@ -32,6 +32,9 @@ export class UserDocument {
   @Prop({ type: [UserBranchAssignmentSchema], default: [] })
   branchAssignments: UserBranchAssignmentSubdoc[];
 
+  @Prop({ default: false })
+  canTransferStock: boolean;
+
   @Prop({ default: true })
   isActive: boolean;
 }

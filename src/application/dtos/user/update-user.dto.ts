@@ -1,8 +1,13 @@
-import { IsArray, IsString, IsOptional, MinLength, IsIn, IsEmail, ValidateNested, ValidateIf } from 'class-validator';
+import { IsArray, IsBoolean, IsString, IsOptional, MinLength, IsIn, IsEmail, ValidateNested, ValidateIf } from 'class-validator';
 import { Type, Transform } from 'class-transformer';
 import { UserBranchAssignmentDto } from './create-user.dto';
 
 export class UpdateUserDto {
+  @Transform(({ obj, key }) => obj[key])
+  @ValidateIf((_, value) => value !== undefined)
+  @IsBoolean()
+  canTransferStock?: boolean;
+
   @IsOptional()
   @IsString()
   @MinLength(2)

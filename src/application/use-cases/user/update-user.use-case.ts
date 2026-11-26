@@ -25,7 +25,8 @@ export class UpdateUserUseCase {
     const role = dto.role || user.role;
     const branchAssignments = role === 'ADMIN' ? [] : (dto.branchAssignments ?? user.branchAssignments ?? []);
     if (role !== 'ADMIN' && !branchAssignments.length) throw new BadRequestException('Asigna al menos una sucursal al usuario');
-    const updated = await this.userRepository.update(id, { ...dto, branchAssignments });
+    const canTransferStock = role === 'VENDEDOR' && (dto.canTransferStock ?? user.canTransferStock) === true;
+    const updated = await this.userRepository.update(id, { ...dto, branchAssignments, canTransferStock });
     const { password, ...result } = updated;
     return result;
   }

@@ -21,7 +21,7 @@ test('direct branch transfers are atomic, preserve lots and reject duplicate or 
   const secret=randomBytes(32).toString('hex');const app=launch('backend',process.execPath,['dist/main.js'],{cwd:path.resolve(__dirname,'..'),env:{...process.env,AGROMAX_ENV_FILE:path.join(temp,'absent.env'),MONGODB_URI:uri,PORT:String(appPort),JWT_SECRET:secret,GREENTER_ENABLED:'false',GREENTER_ALLOW_PRODUCTION:'false',DECOLECTA_API_KEY:''}});
   for(let i=0;i<150;i++){if(app.exitCode!==null)throw Error('Backend terminó. '+path.join(temp,'backend.log'));try{if((await fetch(`http://127.0.0.1:${appPort}/api/health`)).ok)break;}catch{}await delay(100);}
   let authorization;
-  const request=async(method,route,body,expected=method==='POST'?201:200)=>{const res=await fetch(`http://127.0.0.1:${appPort}/api${route}`,{method,headers:{'Content-Type':'application/json','x-branch-id':id(8002),...(authorization?{Authorization:authorization}:{})},...(body===undefined?{}:{body:JSON.stringify(body)})});const json=await res.json();assert.equal(res.status,expected,route+': '+JSON.stringify(json));return json.data;};
+  const request=async(method,route,body,expected=method==='POST'?201:200,branch=id(8002))=>{const res=await fetch(`http://127.0.0.1:${appPort}/api${route}`,{method,headers:{'Content-Type':'application/json','x-branch-id':branch,...(authorization?{Authorization:authorization}:{})},...(body===undefined?{}:{body:JSON.stringify(body)})});const json=await res.json();assert.equal(res.status,expected,route+': '+JSON.stringify(json));return json.data;};
   await request('GET','/stock/branch-transfers',undefined,401);
   authorization='Bearer '+(await request('POST','/auth/login',{username:'mvpadmin',password})).accessToken;const admin=authorization;
   const command=(items=[{productId:id(8010),quantity:2},{productId:id(8011),quantity:1.5}],extra={})=>({requestId:randomUUID(),fromBranchId:id(8002),toBranchId:id(8100),companyId:id(8001),items,notes:'Traslado sintético',...extra});
@@ -41,6 +41,30 @@ test('direct branch transfers are atomic, preserve lots and reject duplicate or 
   await t.test('new destination records and decimal quantities are precise',async()=>{await addProduct(8500,.3,false,null);await move(command([{productId:id(8500),quantity:.1}]));await move(command([{productId:id(8500),quantity:.2}]));assert.equal(await stock(8500),0);assert.equal(await stock(8500,8100),.3);});
   await t.test('an audit insertion failure cannot leave a partial stock transfer',async()=>{const before=await snapshot();await db.command({collMod:'branch_stock_transfers',validator:{$expr:{$eq:[1,0]}}});try{await move(command([{productId:id(8010),quantity:1}]),500);assert.deepEqual(await snapshot(),before);}finally{await db.command({collMod:'branch_stock_transfers',validator:{}});}});
   await t.test('seller and accounting users cannot transfer or read the administrative history',async()=>{const {JwtService}=require('@nestjs/jwt'),jwt=new JwtService({secret});for(const role of ['VENDEDOR','CONTABILIDAD','ALMACENERO']){authorization=admin;const user=await request('POST','/users',{username:'branch-'+role.toLowerCase(),password:'synthetic-password-only',fullName:'Prueba '+role,role,branchAssignments:[{branchId:id(8002),role}]});authorization='Bearer '+jwt.sign({sub:user.id,username:user.username,role:'ADMIN'});await request('GET','/stock/branch-transfers',undefined,403);await request('GET','/stock/branch-transfers/request/'+first.requestId,undefined,403);await move(command(),403);}authorization=admin;});
+  await t.test('an explicitly enabled seller transfers only from the selected assigned branch and retries without duplication',async()=>{
+   const {JwtService}=require('@nestjs/jwt'),jwt=new JwtService({secret});authorization=admin;
+   const seller=await request('POST','/users',{username:'branch-enabled',password:'synthetic-password-only',fullName:'Vendedor autorizado',role:'VENDEDOR',canTransferStock:true,branchAssignments:[{branchId:id(8002),role:'VENDEDOR'}]});
+   assert.equal(seller.canTransferStock,true);const sellerToken='Bearer '+jwt.sign({sub:seller.id,username:seller.username,role:'ADMIN',canTransferStock:true});authorization=sellerToken;
+   const profile=await request('GET','/auth/me');assert.equal(profile.role,'VENDEDOR');assert.equal(profile.canTransferStock,true);
+   assert.deepEqual((await request('GET','/branches/accessible')).map(b=>b.id),[id(8002)]);
+   const options=await request('GET','/stock/branch-transfers/options');assert.deepEqual(options.sourceBranchIds,[id(8002)]);assert.ok(options.branches.some(b=>b.id===id(8100)));assert.ok(!options.branches.some(b=>b.id===id(8201)));
+   await request('GET','/stock/branch-transfers/options',undefined,403,id(8100));
+   await request('GET','/stock/branch-transfers?branchId='+id(8100),undefined,403);
+   await request('PUT','/users/'+seller.id,{canTransferStock:true},403);
+   await request('PUT','/products/'+id(8010),{name:'No autorizado'},403);
+   const before=await snapshot();await move(command([{productId:id(8010),quantity:1}],{fromBranchId:id(8100),toBranchId:id(8002)}),403);assert.deepEqual(await snapshot(),before);
+   const {MongoBranchTransferRepository}=require('../dist/infrastructure/database/mongodb/repositories/mongo-branch-transfer.repository');
+   const repository=new MongoBranchTransferRepository({db:connection});await assert.rejects(repository.transfer(command([{productId:id(8010),quantity:1}],{fromBranchId:id(8100),toBranchId:id(8002)}),seller.id),e=>e.status===403);assert.deepEqual(await snapshot(),before);
+   const payload=command([{productId:id(8010),quantity:1}]);const prior=await stock(8010);const result=await move(payload);assert.equal(result.transferredBy,seller.id);assert.equal(await stock(8010),prior-1);
+   const replay=await move(payload);assert.equal(replay.id,result.id);assert.equal(await stock(8010),prior-1);assert.equal((await request('GET','/stock/branch-transfers/request/'+payload.requestId)).id,result.id);
+   assert.ok((await request('GET','/stock/branch-transfers')).data.every(r=>r.fromBranchId===id(8002)||r.toBranchId===id(8002)));
+   authorization=admin;await request('PUT','/users/'+seller.id,{canTransferStock:false});authorization=sellerToken;
+   await request('GET','/stock/branch-transfers/options',undefined,403);await request('GET','/stock/branch-transfers',undefined,403);await move(command(),403);
+   authorization=admin;
+   for(const value of ['true','false',1,null])await request('PUT','/users/'+seller.id,{canTransferStock:value},400);
+   const denied=await request('POST','/users',{username:'branch-no-grant',password:'synthetic-password-only',fullName:'Sin permiso',role:'VENDEDOR',branchAssignments:[{branchId:id(8002),role:'VENDEDOR'}]});
+   authorization='Bearer '+jwt.sign({sub:denied.id,username:denied.username,role:'ADMIN',canTransferStock:true});await request('GET','/stock/branch-transfers/options',undefined,403);await move(command(),403);authorization=admin;
+  });
   await t.test('history is paginated, filtered by either branch, and exposes no private request keys',async()=>{const result=await request('GET','/stock/branch-transfers?branchId='+id(8100)+'&limit=2');assert.equal(result.data.length,2);assert.ok(result.total>=5);assert.ok(result.data.every(row=>row.toBranchId===id(8100)));assert.ok(result.data.every(row=>!('requestHash'in row)&&!('requestId'in row)));assert.equal((await request('GET','/stock/branch-transfers?branchId='+id(8200))).total,0);assert.equal(await db.collection('billing_documents').countDocuments(),0);assert.equal(await db.collection('stock_requests').countDocuments(),0);});
  }finally{for(const child of processes.reverse()){if(child.exitCode!==null)continue;const ended=new Promise(resolve=>child.once('exit',resolve));child.kill('SIGTERM');const timer=setTimeout(()=>child.kill('SIGKILL'),5000);await ended;clearTimeout(timer);}if(connection)await connection.close();for(const file of files)fs.closeSync(file);}
 });

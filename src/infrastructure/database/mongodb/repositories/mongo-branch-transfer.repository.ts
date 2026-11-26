@@ -1,4 +1,4 @@
-import { BadRequestException, ConflictException, Injectable, OnModuleInit } from '@nestjs/common';
+import { BadRequestException, ConflictException, ForbiddenException, Injectable, OnModuleInit } from '@nestjs/common';
 import { InjectModel } from '@nestjs/mongoose';
 import { createHash } from 'crypto';
 import { Model, Types } from 'mongoose';
@@ -29,6 +29,10 @@ export class MongoBranchTransferRepository implements IBranchTransferRepository,
     const from = new Types.ObjectId(command.fromBranchId), to = new Types.ObjectId(command.toBranchId), company = new Types.ObjectId(command.companyId), actor = new Types.ObjectId(userId);
     try {
       const result = await session.withTransaction(async () => {
+        const user = await db.collection('users').findOne({ _id: actor, isActive: true }, { session });
+        const permittedSeller = user?.role === 'VENDEDOR' && user.canTransferStock === true
+          && (user.branchAssignments || []).some((assignment: any) => assignment.branch?.toString() === command.fromBranchId && assignment.role === 'VENDEDOR');
+        if (!user || (user.role !== 'ADMIN' && !permittedSeller)) throw new ForbiddenException('El usuario no está autorizado para transferir desde esta sucursal');
         const existing = await transfers.findOne({ requestId: command.requestId }, { session });
         if (existing) return replay(existing);
         // Native collections use explicit branch IDs for both sides; ordinary branch middleware must not rewrite them.
@@ -37,8 +41,7 @@ export class MongoBranchTransferRepository implements IBranchTransferRepository,
         if (!source || !destination || from.equals(to)) throw new BadRequestException('Elige dos sucursales activas y diferentes');
         if (![source, destination].every(row => (row.companies || []).some((value: any) => value.toString() === command.companyId))) throw new BadRequestException('La empresa debe estar habilitada en ambas sucursales');
         const issuer = await db.collection('companies').findOne({ _id: company, isActive: true }, { session });
-        const user = await db.collection('users').findOne({ _id: actor, isActive: true, role: 'ADMIN' }, { session });
-        if (!issuer || !user) throw new BadRequestException('Empresa o administrador no disponible');
+        if (!issuer) throw new BadRequestException('Empresa no disponible');
         const items: BranchTransferEntity['items'] = [];
         for (const item of command.items) {
           const productId = new Types.ObjectId(item.productId);
@@ -112,7 +115,7 @@ export class MongoBranchTransferRepository implements IBranchTransferRepository,
   async findByRequest(requestId: string, userId: string) {
     const record = await this.model.db.db!.collection('branch_stock_transfers').findOne({ requestId });
     if (!record) return null;
-    if (record.transferredBy.toString() !== userId) throw new ConflictException('El envío pertenece a otro administrador');
+    if (record.transferredBy.toString() !== userId) throw new ConflictException('El envío pertenece a otro usuario');
     return this.toEntity(record);
   }
   private toEntity(record: any): BranchTransferEntity {

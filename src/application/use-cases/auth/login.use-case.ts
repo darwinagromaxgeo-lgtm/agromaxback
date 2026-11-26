@@ -28,7 +28,7 @@ export class LoginUseCase {
     const payload = { sub: user.id, username: user.username, role: user.role };
     return {
       accessToken: this.jwtService.sign(payload),
-      user: { id: user.id, username: user.username, email: user.email, fullName: user.fullName, role: user.role, branchAssignments: user.branchAssignments || [] },
+      user: { id: user.id, username: user.username, email: user.email, fullName: user.fullName, role: user.role, branchAssignments: user.branchAssignments || [], canTransferStock: user.canTransferStock === true },
     };
   }
 }

@@ -29,10 +29,11 @@ export class CreateUserUseCase {
       password: hashedPassword,
       fullName: dto.fullName,
       role,
+      canTransferStock: role === 'VENDEDOR' && dto.canTransferStock === true,
       branchAssignments: role === 'ADMIN' ? [] : dto.branchAssignments,
       isActive: true,
     });
 
-    return { id: user.id, username: user.username, email: user.email, fullName: user.fullName, role: user.role, branchAssignments: user.branchAssignments, isActive: user.isActive };
+    return { id: user.id, username: user.username, email: user.email, fullName: user.fullName, role: user.role, branchAssignments: user.branchAssignments, canTransferStock: user.canTransferStock === true, isActive: user.isActive };
   }
 }

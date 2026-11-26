@@ -11,6 +11,7 @@ export interface UserEntity {
   fullName: string;
   role: string;
   branchAssignments?: UserBranchAssignment[];
+  canTransferStock?: boolean;
   isActive: boolean;
   createdAt?: Date;
   updatedAt?: Date;
