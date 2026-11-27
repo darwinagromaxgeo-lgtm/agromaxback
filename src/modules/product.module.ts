@@ -15,9 +15,10 @@ import { StockMovementModule } from './stock-movement.module';
 import { CloudinaryModule } from '../infrastructure/cloudinary/cloudinary.module';
 import { CategoryModule } from './category.module';
 import { UnitModule } from './unit.module';
+import { CompanyModule } from './company.module';
 
 @Module({
-  imports: [MongooseModule.forFeature([{ name: ProductDocument.name, schema: ProductSchema }]), StockModule, StockMovementModule, CloudinaryModule, CategoryModule, UnitModule],
+  imports: [MongooseModule.forFeature([{ name: ProductDocument.name, schema: ProductSchema }]), StockModule, StockMovementModule, CloudinaryModule, CategoryModule, UnitModule, CompanyModule],
   controllers: [ProductController],
   providers: [{ provide: PRODUCT_REPOSITORY, useClass: MongoProductRepository }, CreateProductUseCase, GetProductsUseCase, UpdateProductUseCase, DeleteProductUseCase, GetPriceFloorAlertsUseCase, ImportProductsUseCase],
   exports: [PRODUCT_REPOSITORY],

@@ -16,6 +16,9 @@ import { UpdateProductDto } from '../../application/dtos/product/update-product.
 import { FilterProductDto } from '../../application/dtos/product/filter-product.dto';
 import { CurrentUser } from '../../common/decorators/current-user.decorator';
 import { Roles } from '../../common/decorators/roles.decorator';
+import { BranchScoped } from '../../common/decorators/branch-scoped.decorator';
+import { CurrentBranch } from '../../common/decorators/current-branch.decorator';
+import { BranchEntity } from '../../domain/entities/branch.entity';
 
 @ApiTags('Products')
 @ApiBearerAuth('JWT')
@@ -33,9 +36,10 @@ export class ProductController {
   ) {}
 
   @Post()
+  @BranchScoped()
   @Roles('ADMIN')
   @ApiOperation({ summary: 'Crear producto', description: 'Registra un nuevo producto en el catalogo' })
-  async create(@Body() dto: CreateProductDto, @CurrentUser('id') userId: string) { return this.createProduct.execute(dto, userId); }
+  async create(@Body() dto: CreateProductDto, @CurrentUser('id') userId: string, @CurrentBranch() branch: BranchEntity) { return this.createProduct.execute(dto, userId, branch); }
 
   @Get('price-floor-alerts')
   @ApiOperation({ summary: 'Productos en precio mínimo', description: 'Productos cuyo precio de venta alcanzó el límite inferior (C. Adquisición + 5%)' })

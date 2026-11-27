@@ -1,4 +1,4 @@
-import { IsString, IsOptional, IsArray, ValidateNested, IsNumber, Min, IsIn, IsBoolean, ValidateIf } from 'class-validator';
+import { IsString, IsOptional, IsArray, ValidateNested, IsNumber, Min, IsIn, IsBoolean, ValidateIf, IsMongoId } from 'class-validator';
 import { Type, Transform } from 'class-transformer';
 import { IgvTaxType } from '../../../domain/enums';
 
@@ -24,7 +24,7 @@ export class ProductPriceDto {
 }
 
 export class InitialStockDto {
-  @IsString()
+  @IsMongoId()
   companyId: string;
 
   @IsNumber()

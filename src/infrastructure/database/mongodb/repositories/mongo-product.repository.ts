@@ -12,6 +12,17 @@ export class MongoProductRepository implements IProductRepository {
     private readonly productModel: Model<ProductDoc>,
   ) {}
 
+  async createWithEffects(product: ProductEntity, effects: (created: ProductEntity) => Promise<void>): Promise<ProductEntity> {
+    // All Mongoose writes inside effects must share this transaction, including
+    // stock and Kardex, so a late failure cannot leave a partially created item.
+    this.productModel.db.base.set('transactionAsyncLocalStorage', true);
+    return this.productModel.db.transaction(async () => {
+      const created = await this.create(product);
+      await effects(created);
+      return created;
+    });
+  }
+
   async create(product: ProductEntity): Promise<ProductEntity> {
     const created = await this.productModel.create({
       name: product.name,

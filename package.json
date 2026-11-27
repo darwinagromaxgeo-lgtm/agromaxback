@@ -4,6 +4,7 @@
   "private": true,
   "scripts": {
     "build": "nest build",
+    "test:products": "npm run build && node --test tests/product-creation.test.cjs tests/product-catalog.test.cjs tests/product-billing.test.cjs",
     "test:security": "npm run build && node --test --test-isolation=none tests/security-regression.test.cjs",
     "test:billing": "npm run build && node --test tests/billing-regression.test.cjs",
     "test:credit-notes": "npm run build && node --test tests/credit-notes.test.cjs",
